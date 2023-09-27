@@ -1,0 +1,210 @@
+---
+title: "Quality-control"
+author: "unawaz1996"
+date: "2023-09-23"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+# Set-up
+
+```{r libraries}
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+source("code/libraries.R")
+```
+
+```{r}
+twoCols <- c(rgb(0.8, 0.1, 0.1), rgb(0.2, 0.2, 0.8))
+```
+
+
+```{r}
+ah <- AnnotationHub() %>%
+    subset(species == "Homo sapiens") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)
+
+mcols(transGR) = mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+```
+
+
+
+```{r}
+mcols(genesGR) <- mcols(genesGR) %>%
+  as.data.frame() %>%
+  dplyr::select(
+    gene_id, gene_name, gene_biotype, entrezid
+  ) %>%
+  left_join(
+    mcols(transGR) %>%
+      as.data.frame() %>%
+      mutate(
+        tx_support_level = case_when(
+          is.na(tx_support_level) ~ 1L, 
+          TRUE ~ tx_support_level
+        )
+      ) %>%
+      group_by(gene_id) %>%
+      summarise(
+        n_tx = n(),
+        longest_tx = max(tx_len),
+        ave_tx_len = mean(tx_len),
+        gc_content = sum(tx_len*gc_content) / sum(tx_len)
+      ) %>%
+      mutate(
+        bin_length = cut(
+          x = ave_tx_len,
+          labels = seq_len(10),
+          breaks = quantile(ave_tx_len, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin_gc = cut(
+          x = gc_content,
+          labels = seq_len(10),
+          breaks = quantile(gc_content, probs = seq(0, 1, length.out = 11)),
+          include.lowest = TRUE
+        ),
+        bin = paste(bin_gc, bin_length, sep = "_")
+      ),
+    by = "gene_id"
+  ) %>%
+  set_rownames(.$gene_id) %>%
+  as("DataFrame")
+
+trans2Gene <- mcols(transGR) %>%
+    as.data.frame() %>%
+    dplyr::select(tx_id, gene_id) %>%
+    dplyr::filter(!is.na(tx_id), !is.na(gene_id)) %>%
+    as_tibble()
+
+```
+
+# FastQC summary 
+
+```{r load-fastqc}
+rawFqc <- list.files(
+    path = here::here("data/fastqc"),
+    pattern = "zip",
+    full.names = TRUE
+    ) %>%
+    FastqcDataList()
+
+```
+
+
+```{r}
+sum_raw = plotSummary(rawFqc)
+sum_raw
+```
+
+## Library sizes
+
+Library sizes for unprocessed data ranged between 86,178,215 and 129,449,694 reads.
+
+```{r}
+r1 <- grepl("_1", fqName(rawFqc))
+r2 = grepl("_2", fqName(rawFqc))
+#trmd_r1 <- grepl("_1", fqName(trmdFqc))
+raw_reads = plotReadTotals(rawFqc[r1], barCols = twoCols)
+
+raw_reads
+#trmd_reads = plotReadTotals(trmdFqc[trmd_r1], barCols = twoCols)
+#grid.arrange(raw_reads, trmd_reads, nrow=2)
+```
+
+
+```{r}
+reads <- readTotals(rawFqc)
+#reads_trimmed = readTotals(trmdFqc)
+reads %>%
+  as.data.frame() %>% 
+  dplyr::rename("Raw" = "Total_Sequences") %>% 
+  DT::datatable()
+  #cbind(dplyr::rename(as.data.frame(reads_trimmed),"Trimmed" = "Total_Sequences", "New" = "Filename")) %>% 
+  #dplyr::select(-New) %>% 
+  #mutate(names = gsub("\\_.*", "", Filename)) %>% 
+  #left_join(md) %>% 
+  #dplyr::select(names, Group, Condition_UPF3B, Condition_UPF3A, "Label"= Please_Label, everything()) %>% 
+  #stargazer(title="Sample information including number of raw reads obtained for each sample through Illumina paired-end sequencing and the #number of reads retained after adapter and quality trimming",  summary=FALSE, rownames = FALSE, out = #"output/QC/Thesis_tables/data_summary.tex")
+```
+
+
+
+
+```{r}
+gcPlots <- list(
+   r1 = plotGcContent(
+       x = rawFqc[r1],
+       plotType = "line",
+       gcType = "Transcriptome",
+       species = "Hsapiens"
+   ),
+   r2 = plotGcContent(
+       x = rawFqc[!r1],
+       plotType = "line",
+       gcType = "Transcriptome",
+       species = "Hsapiens"
+   )
+)
+lg <- get_legend(gcPlots$r2 + theme(legend.position = "bottom"))
+#pdf(file ="output/QC/Thesis_figures/Transcript_GC.pdf", width = 7.52, height = 5.83)
+plot_grid(
+   plot_grid(
+       r1 = gcPlots$r1 +
+           ggtitle("R1: GC Distribution", subtitle = c()) +
+           theme(legend.position = "none"),
+       r2 = gcPlots$r2 +
+           ggtitle("R2: GC Distribution", subtitle = c()) +
+           theme(legend.position = "none")
+   ),
+   lg = lg,
+   nrow = 2,
+   rel_heights = c(5,2)
+)
+#dev.off
+
+```
+
+
+### Per base sequence quality
+```{r}
+
+pbsQ_all = plotBaseQuals(rawFqc)
+pbsQ_sample = plotSeqQuals(rawFqc[[1]])
+#ggsave(filename = "output/QC/Thesis_figures/pbqS_all.svg", width = 7.52, height = 5.83, 
+ #      units = "in", plot=pbsQ_all)
+#ggsave(filename = "output/QC/Thesis_figures/pbqS_sample.svg", width = 7.52, height = 5.83, 
+ #      units = "in", plot=pbsQ_sample)
+
+pbsQ_all 
+```
+
+### Per base sequence content 
+
+```{r}
+plotSeqContent(rawFqc[[1]])
+plotSeqContent(rawFqc)
+plotSeqContent(rawFqc[1:2], plotType = "line", nc = 1)
+```
+
+
