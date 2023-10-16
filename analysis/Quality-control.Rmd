@@ -934,12 +934,6 @@ dds$Group <- factor(dds$Group, levels = c("Control","UPF1", "FRAX", "FMR1"))
 ```
 
 
-## Exploratory DEG analysis 
-
-
-```{r}
-dds$Group <- factor(dds$Group, levels = c("Control","UPF1", "FRAX"))
-```
 
 ```{r}
 dds <- DESeqDataSetFromTximport(txi_genes,
