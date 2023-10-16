@@ -1,0 +1,206 @@
+
+SUMMARISING RUN PARAMETERS
+==========================
+Input filename: /srv/scratch/voineagu/PROJECTS/NMD_data/FMR1/200_L4_2.fq.gz
+Trimming mode: paired-end
+Trim Galore version: 0.6.10
+Cutadapt version: 4.4
+Python version: 3.11.2
+Number of cores used for trimming: 12
+Quality Phred score cutoff: 20
+Quality encoding type selected: ASCII+33
+Using Illumina adapter for trimming (count: 9589). Second best hit was smallRNA (count: 15)
+Adapter sequence: 'AGATCGGAAGAGC' (Illumina TruSeq, Sanger iPCR; auto-detected)
+Maximum trimming error rate: 0.1 (default)
+Minimum required adapter overlap (stringency): 6 bp
+Minimum required sequence length for both reads before a sequence pair gets removed: 20 bp
+Running FastQC on the data once trimming has completed
+Running FastQC with the following extra arguments: -t 8
+Output file will be GZIP compressed
+
+
+This is cutadapt 4.4 with Python 3.11.2
+Command line parameters: -j 12 -e 0.1 -q 20 -O 6 -a AGATCGGAAGAGC /srv/scratch/voineagu/PROJECTS/NMD_data/FMR1/200_L4_2.fq.gz
+Processing single-end reads on 12 cores ...
+Finished in 551.347 s (4.569 µs/read; 13.13 M reads/minute).
+
+=== Summary ===
+
+Total reads processed:             120,662,673
+Reads with adapters:                 1,720,325 (1.4%)
+Reads written (passing filters):   120,662,673 (100.0%)
+
+Total basepairs processed: 18,099,400,950 bp
+Quality-trimmed:              29,977,880 bp (0.2%)
+Total written (filtered):  18,026,544,764 bp (99.6%)
+
+=== Adapter 1 ===
+
+Sequence: AGATCGGAAGAGC; Type: regular 3'; Length: 13; Trimmed: 1720325 times
+
+Minimum overlap: 6
+No. of allowed errors:
+1-9 bp: 0; 10-13 bp: 1
+
+Bases preceding removed adapters:
+  A: 8.2%
+  C: 45.3%
+  G: 34.1%
+  T: 12.4%
+  none/other: 0.0%
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+6	78724	29458.7	0	78724
+7	75411	7364.7	0	75411
+8	70756	1841.2	0	70756
+9	53500	460.3	0	49872 3628
+10	65024	115.1	1	56823 8201
+11	58354	28.8	1	52810 5544
+12	57868	7.2	1	54376 3492
+13	51954	1.8	1	49245 2709
+14	57781	1.8	1	54364 3417
+15	47477	1.8	1	45075 2402
+16	48463	1.8	1	45608 2855
+17	55810	1.8	1	52663 3147
+18	37204	1.8	1	35616 1588
+19	47736	1.8	1	45188 2548
+20	46176	1.8	1	43368 2808
+21	38341	1.8	1	36534 1807
+22	38580	1.8	1	36850 1730
+23	38900	1.8	1	37044 1856
+24	46857	1.8	1	44130 2727
+25	37661	1.8	1	35970 1691
+26	31811	1.8	1	30463 1348
+27	30534	1.8	1	29196 1338
+28	34036	1.8	1	32474 1562
+29	28713	1.8	1	27334 1379
+30	32128	1.8	1	30720 1408
+31	26387	1.8	1	25254 1133
+32	28332	1.8	1	27005 1327
+33	27487	1.8	1	26163 1324
+34	24304	1.8	1	23193 1111
+35	30204	1.8	1	28948 1256
+36	21469	1.8	1	20544 925
+37	25183	1.8	1	24259 924
+38	15101	1.8	1	14471 630
+39	23383	1.8	1	22211 1172
+40	14957	1.8	1	14359 598
+41	18038	1.8	1	17144 894
+42	18724	1.8	1	17827 897
+43	14699	1.8	1	14073 626
+44	16187	1.8	1	15333 854
+45	15006	1.8	1	14272 734
+46	14834	1.8	1	14152 682
+47	11992	1.8	1	11433 559
+48	11103	1.8	1	10525 578
+49	13247	1.8	1	12597 650
+50	8899	1.8	1	8350 549
+51	9840	1.8	1	9373 467
+52	8103	1.8	1	7646 457
+53	8160	1.8	1	7719 441
+54	8776	1.8	1	8258 518
+55	6102	1.8	1	5807 295
+56	6730	1.8	1	6345 385
+57	8408	1.8	1	7868 540
+58	4259	1.8	1	3948 311
+59	4274	1.8	1	3956 318
+60	5268	1.8	1	4878 390
+61	3550	1.8	1	3262 288
+62	3659	1.8	1	3307 352
+63	6499	1.8	1	5998 501
+64	2717	1.8	1	2266 451
+65	2028	1.8	1	1790 238
+66	2335	1.8	1	2089 246
+67	2413	1.8	1	2155 258
+68	2173	1.8	1	1908 265
+69	1854	1.8	1	1629 225
+70	2020	1.8	1	1837 183
+71	1552	1.8	1	1365 187
+72	1565	1.8	1	1278 287
+73	2300	1.8	1	1960 340
+74	1210	1.8	1	1024 186
+75	711	1.8	1	547 164
+76	351	1.8	1	196 155
+77	537	1.8	1	379 158
+78	776	1.8	1	547 229
+79	758	1.8	1	585 173
+80	711	1.8	1	516 195
+81	840	1.8	1	603 237
+82	721	1.8	1	519 202
+83	745	1.8	1	523 222
+84	786	1.8	1	539 247
+85	685	1.8	1	470 215
+86	589	1.8	1	415 174
+87	642	1.8	1	442 200
+88	571	1.8	1	381 190
+89	571	1.8	1	361 210
+90	547	1.8	1	379 168
+91	525	1.8	1	366 159
+92	563	1.8	1	361 202
+93	480	1.8	1	291 189
+94	556	1.8	1	316 240
+95	449	1.8	1	287 162
+96	406	1.8	1	254 152
+97	405	1.8	1	253 152
+98	610	1.8	1	330 280
+99	469	1.8	1	280 189
+100	398	1.8	1	260 138
+101	409	1.8	1	218 191
+102	423	1.8	1	244 179
+103	470	1.8	1	249 221
+104	489	1.8	1	251 238
+105	391	1.8	1	225 166
+106	313	1.8	1	164 149
+107	305	1.8	1	216 89
+108	345	1.8	1	178 167
+109	315	1.8	1	171 144
+110	298	1.8	1	138 160
+111	284	1.8	1	174 110
+112	339	1.8	1	185 154
+113	272	1.8	1	145 127
+114	285	1.8	1	152 133
+115	266	1.8	1	150 116
+116	225	1.8	1	117 108
+117	230	1.8	1	111 119
+118	234	1.8	1	101 133
+119	221	1.8	1	125 96
+120	230	1.8	1	126 104
+121	213	1.8	1	107 106
+122	204	1.8	1	102 102
+123	219	1.8	1	100 119
+124	249	1.8	1	92 157
+125	226	1.8	1	83 143
+126	174	1.8	1	77 97
+127	232	1.8	1	56 176
+128	177	1.8	1	41 136
+129	150	1.8	1	53 97
+130	197	1.8	1	27 170
+131	121	1.8	1	29 92
+132	86	1.8	1	18 68
+133	133	1.8	1	28 105
+134	65	1.8	1	15 50
+135	90	1.8	1	12 78
+136	91	1.8	1	7 84
+137	85	1.8	1	8 77
+138	49	1.8	1	4 45
+139	48	1.8	1	3 45
+140	38	1.8	1	4 34
+141	60	1.8	1	4 56
+142	119	1.8	1	0 119
+143	44	1.8	1	0 44
+144	25	1.8	1	2 23
+145	31	1.8	1	0 31
+146	40	1.8	1	1 39
+147	113	1.8	1	2 111
+148	49	1.8	1	2 47
+149	54	1.8	1	0 54
+150	67	1.8	1	0 67
+
+RUN STATISTICS FOR INPUT FILE: /srv/scratch/voineagu/PROJECTS/NMD_data/FMR1/200_L4_2.fq.gz
+=============================================
+120662673 sequences processed in total
+
+Total number of sequences analysed for the sequence pair length validation: 120662673
+
+Number of sequence pairs removed because at least one read was shorter than the length cutoff (20 bp): 39333 (0.03%)

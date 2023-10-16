@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="unawaz1996" />
+
+<meta name="date" content="2023-09-28" />
+
+<title>Exploratory-DEG</title>
+
+<script src="site_libs/header-attrs-2.24/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.4.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">UPF1-FMR1</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/unawaz1996/UPF1-FMR1">
+    <span class="fab fa-github"></span>
+     
+    Source code
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Exploratory-DEG</h1>
+<h4 class="author">unawaz1996</h4>
+<h4 class="date">2023-09-28</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2023-10-05
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 5
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 2
+</p>
+<p>
+<strong>Knit directory:</strong> <code>UPF1-FMR1/</code> <span
+class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.1). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges">
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted
+changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R
+Markdown file created these results, you’ll want to first commit it to
+the Git repo. If you’re still working on the analysis, you can ignore
+this warning. When you’re finished, you can run
+<code>wflow_publish</code> to commit the R Markdown file and build the
+HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20230923code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20230923)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20230923code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20230923)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongabsolute">
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> <strong>File paths:</strong> absolute </a>
+</p>
+</div>
+<div id="strongFilepathsstrongabsolute" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Using absolute paths to the files within your workflowr project makes it
+difficult for you and others to run your code on a different machine.
+Change the absolute path(s) below to the suggested relative path(s) to
+make your code more reproducible.
+</p>
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th style="text-align:left;">
+absolute
+</th>
+<th style="text-align:left;">
+relative
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+/home/neuro/Documents/NMD_analysis/Analysis/UPF1-FMR1/code/libraries.R
+</td>
+<td style="text-align:left;">
+code/libraries.R
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomunawaz1996UPF1FMR1tree76cb996f009156d9050a3cca15d27e1bb2feb351targetblank76cb996a">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/unawaz1996/UPF1-FMR1/tree/76cb996f009156d9050a3cca15d27e1bb2feb351" target="_blank">76cb996</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomunawaz1996UPF1FMR1tree76cb996f009156d9050a3cca15d27e1bb2feb351targetblank76cb996a"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/unawaz1996/UPF1-FMR1/tree/76cb996f009156d9050a3cca15d27e1bb2feb351" target="_blank">76cb996</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/Exploratory-DEG.nb.html
+
+Untracked files:
+    Untracked:  analysis/Exploratory-DEG.Rmd
+    Untracked:  data/Sample_info.csv
+    Untracked:  data/fastqc/Raw/
+    Untracked:  data/fastqc/Trimmed/
+
+Unstaged changes:
+    Modified:   analysis/Quality-control.Rmd
+    Deleted:    data/fastqc/1-XX61045-LEJ5123_L2_1_fastqc.html
+    Deleted:    data/fastqc/1-XX61045-LEJ5123_L2_1_fastqc.zip
+    Deleted:    data/fastqc/1-XX61045-LEJ5123_L2_2_fastqc.html
+    Deleted:    data/fastqc/1-XX61045-LEJ5123_L2_2_fastqc.zip
+    Deleted:    data/fastqc/183_L3_1_fastqc.html
+    Deleted:    data/fastqc/183_L3_1_fastqc.zip
+    Deleted:    data/fastqc/184_L3_1_fastqc.html
+    Deleted:    data/fastqc/184_L3_1_fastqc.zip
+    Deleted:    data/fastqc/185_L3_1_fastqc.html
+    Deleted:    data/fastqc/185_L3_1_fastqc.zip
+    Deleted:    data/fastqc/186_L3_1_fastqc.html
+    Deleted:    data/fastqc/186_L3_1_fastqc.zip
+    Deleted:    data/fastqc/187_L3_1_fastqc.html
+    Deleted:    data/fastqc/187_L3_1_fastqc.zip
+    Deleted:    data/fastqc/189_L3_1_fastqc.html
+    Deleted:    data/fastqc/189_L3_1_fastqc.zip
+    Deleted:    data/fastqc/190_L3_1_fastqc.html
+    Deleted:    data/fastqc/190_L3_1_fastqc.zip
+    Deleted:    data/fastqc/191_L3_1_fastqc.html
+    Deleted:    data/fastqc/191_L3_1_fastqc.zip
+    Deleted:    data/fastqc/192_L3_1_fastqc.html
+    Deleted:    data/fastqc/192_L3_1_fastqc.zip
+    Deleted:    data/fastqc/193_L3_1_fastqc.html
+    Deleted:    data/fastqc/193_L3_1_fastqc.zip
+    Deleted:    data/fastqc/194_L3_1_fastqc.html
+    Deleted:    data/fastqc/194_L3_1_fastqc.zip
+    Deleted:    data/fastqc/195_L3_1_fastqc.html
+    Deleted:    data/fastqc/195_L3_1_fastqc.zip
+    Deleted:    data/fastqc/196_L3_1_fastqc.html
+    Deleted:    data/fastqc/196_L3_1_fastqc.zip
+    Deleted:    data/fastqc/197_L3_1_fastqc.html
+    Deleted:    data/fastqc/197_L3_1_fastqc.zip
+    Deleted:    data/fastqc/198_L3_1_fastqc.html
+    Deleted:    data/fastqc/198_L3_1_fastqc.zip
+    Deleted:    data/fastqc/199_L3_1_fastqc.html
+    Deleted:    data/fastqc/199_L3_1_fastqc.zip
+    Deleted:    data/fastqc/2-FD61046-LEJ5124_L2_1_fastqc.html
+    Deleted:    data/fastqc/2-FD61046-LEJ5124_L2_1_fastqc.zip
+    Deleted:    data/fastqc/2-FD61046-LEJ5124_L2_2_fastqc.html
+    Deleted:    data/fastqc/2-FD61046-LEJ5124_L2_2_fastqc.zip
+    Deleted:    data/fastqc/200_L4_1_fastqc.html
+    Deleted:    data/fastqc/200_L4_1_fastqc.zip
+    Deleted:    data/fastqc/200_L4_2_fastqc.html
+    Deleted:    data/fastqc/200_L4_2_fastqc.zip
+    Deleted:    data/fastqc/201_L4_1_fastqc.html
+    Deleted:    data/fastqc/201_L4_1_fastqc.zip
+    Deleted:    data/fastqc/201_L4_2_fastqc.html
+    Deleted:    data/fastqc/201_L4_2_fastqc.zip
+    Deleted:    data/fastqc/202_L4_1_fastqc.html
+    Deleted:    data/fastqc/202_L4_1_fastqc.zip
+    Deleted:    data/fastqc/204_L4_1_fastqc.html
+    Deleted:    data/fastqc/204_L4_1_fastqc.zip
+    Deleted:    data/fastqc/204_L4_2_fastqc.html
+    Deleted:    data/fastqc/204_L4_2_fastqc.zip
+    Deleted:    data/fastqc/206_L4_1_fastqc.html
+    Deleted:    data/fastqc/206_L4_1_fastqc.zip
+    Deleted:    data/fastqc/206_L4_2_fastqc.html
+    Deleted:    data/fastqc/206_L4_2_fastqc.zip
+    Deleted:    data/fastqc/207_L4_1_fastqc.html
+    Deleted:    data/fastqc/207_L4_1_fastqc.zip
+    Deleted:    data/fastqc/207_L4_2_fastqc.html
+    Deleted:    data/fastqc/207_L4_2_fastqc.zip
+    Deleted:    data/fastqc/208_L4_1_fastqc.html
+    Deleted:    data/fastqc/208_L4_1_fastqc.zip
+    Deleted:    data/fastqc/208_L4_2_fastqc.html
+    Deleted:    data/fastqc/208_L4_2_fastqc.zip
+    Deleted:    data/fastqc/209_L4_1_fastqc.html
+    Deleted:    data/fastqc/209_L4_1_fastqc.zip
+    Deleted:    data/fastqc/209_L4_2_fastqc.html
+    Deleted:    data/fastqc/209_L4_2_fastqc.zip
+    Deleted:    data/fastqc/210_L4_1_fastqc.html
+    Deleted:    data/fastqc/210_L4_1_fastqc.zip
+    Deleted:    data/fastqc/210_L4_2_fastqc.html
+    Deleted:    data/fastqc/210_L4_2_fastqc.zip
+    Deleted:    data/fastqc/23-LDJ6767_L3_1_fastqc.html
+    Deleted:    data/fastqc/23-LDJ6767_L3_1_fastqc.zip
+    Deleted:    data/fastqc/24-LDJ6768_L3_1_fastqc.html
+    Deleted:    data/fastqc/24-LDJ6768_L3_1_fastqc.zip
+    Deleted:    data/fastqc/24-LDJ6768_L3_2_fastqc.html
+    Deleted:    data/fastqc/24-LDJ6768_L3_2_fastqc.zip
+    Deleted:    data/fastqc/4-MC21-60895-LEJ5126_L2_1_fastqc.html
+    Deleted:    data/fastqc/4-MC21-60895-LEJ5126_L2_1_fastqc.zip
+    Deleted:    data/fastqc/4-MC21-60895-LEJ5126_L2_2_fastqc.html
+    Deleted:    data/fastqc/4-MC21-60895-LEJ5126_L2_2_fastqc.zip
+    Deleted:    data/fastqc/5-MC30-60904-LEJ5127_L2_1_fastqc.html
+    Deleted:    data/fastqc/5-MC30-60904-LEJ5127_L2_1_fastqc.zip
+    Deleted:    data/fastqc/5-MC30-60904-LEJ5127_L2_2_fastqc.html
+    Deleted:    data/fastqc/5-MC30-60904-LEJ5127_L2_2_fastqc.zip
+    Deleted:    data/fastqc/6-MC37-60927-LEJ5128_L2_1_fastqc.html
+    Deleted:    data/fastqc/6-MC37-60927-LEJ5128_L2_1_fastqc.zip
+    Deleted:    data/fastqc/6-MC37-60927-LEJ5128_L2_2_fastqc.html
+    Deleted:    data/fastqc/6-MC37-60927-LEJ5128_L2_2_fastqc.zip
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with
+<code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<pre class="r"><code>source(&quot;/home/neuro/Documents/NMD_analysis/Analysis/UPF1-FMR1/code/libraries.R&quot;)
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(gridExtra)
+library(EnsDb.Hsapiens.v86)
+library(ggrepel)
+library(tibble)</code></pre>
+<pre class="r"><code>txdf = transcripts(EnsDb.Hsapiens.v86, return.type=&quot;DataFrame&quot;)
+tx2gene = as.data.frame(txdf[,c(&quot;tx_id&quot;,&quot;gene_id&quot;, &quot;tx_biotype&quot;)])</code></pre>
+<div id="introduction---urwahs-analysis" class="section level2">
+<h2>Introduction - Urwah’s analysis</h2>
+<p>This includes my preprocessing using Salmon</p>
+<pre class="r"><code>salmon.files = (&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon&quot;)
+salmon = list.files(salmon.files, pattern = &quot;transcripts$&quot;, full.names = TRUE)
+all_files = file.path(salmon, &quot;quant.sf&quot;)
+sample_names = gsub(&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/&quot;, &quot;&quot;, salmon)
+sample_names = gsub(&quot;.gz_transcripts&quot;, &quot;&quot;, sample_names)
+sample_names = gsub(&quot;\\_.*&quot;, &quot;&quot;, sample_names)
+#sasample_names[29] = gsub(&quot;_L3&quot;, &quot;&quot;, sample_names[29])
+names(all_files) &lt;- sample_names
+md = read.csv(here::here(&quot;data/Sample_info.csv&quot;), header= TRUE) %&gt;%  
+  #mutate(files = file.path(salmon, &quot;quant.sf&quot;)) %&gt;% 
+  dplyr::rename(&quot;names&quot; = &quot;GeneWiz.ID&quot;, 
+                &quot;Group&quot; = &quot;Sample.type&quot;) %&gt;% 
+  mutate(Group = ifelse(Group == &quot;MC&quot; | Group == &quot;FC&quot;, &quot;Control&quot;, Group)) %&gt;%
+  dplyr::select(names,everything()) %&gt;% 
+  mutate(names = gsub(&quot;\\_.*&quot;, &quot;&quot;, names) )
+md = md[order(match(md$names, sample_names)),]
+md %&lt;&gt;% 
+  rownames_to_column(&quot;random&quot;) %&gt;% 
+#  column_to_rownames(&quot;names&quot;) %&gt;%
+  dplyr::select(-random) %&gt;%
+  mutate(files = all_files)
+
+#comparisons = unique(md$Group)[-1]
+#md$names = as.character(md$names)</code></pre>
+<pre class="r"><code>txi_genes =  tximport(all_files, type=&quot;salmon&quot;, txOut=FALSE,
+                      countsFromAbundance=&quot;scaledTPM&quot;, tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
+keep.genes = (rowSums(txi_genes$abundance &gt;= 1 ) &gt;= 2)</code></pre>
+</div>
+<div id="principal-component-analysis" class="section level2">
+<h2>Principal component analysis</h2>
+<pre class="r"><code>pca = log2(txi_genes$abundance[keep.genes,]  + 0.05) %&gt;%
+    t() %&gt;% 
+    prcomp(scale = FALSE)</code></pre>
+<ul>
+<li>PCA using salmon abundance</li>
+</ul>
+<pre class="r"><code>pcaVars &lt;- percent_format(0.1)(summary(pca)$importance[&quot;Proportion of Variance&quot;,]) 
+
+gene_pca = pca$x[,1:2] %&gt;% 
+    as.data.frame()  %&gt;%
+   rownames_to_column(&quot;names&quot;) %&gt;%
+    left_join(md, by= &quot;names&quot;) %&gt;% 
+    as.tibble() %&gt;%
+    ggplot(aes(PC1, PC2, color = Group, shape = as.character(Batch))) +
+    geom_point(size = 8) +
+    theme_bw() + 
+   geom_text_repel(aes(label = Sample.ID), show.legend = FALSE) +
+    theme(axis.title.y = element_text(size = 12), axis.title.x = element_text(size = 12), 
+          axis.text = element_text(size = 10)) +
+  labs(x = paste0(&quot;PC1 (&quot;, pcaVars[[&quot;PC1&quot;]], &quot;)&quot;),
+    y = paste0(&quot;PC2 (&quot;, pcaVars[[&quot;PC2&quot;]], &quot;)&quot;))
+
+gene_pca</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-6-1.png" alt="Principal component analysis" width="672" />
+<p class="caption">
+Principal component analysis
+</p>
+</div>
+<ul>
+<li>PCA using DESeq2 VST transformation as in Clare</li>
+</ul>
+<pre class="r"><code>dds &lt;- DESeqDataSetFromTximport(txi_genes,
+                                colData = md,
+                                design = ~ Group + Batch + Sex)</code></pre>
+<pre class="r"><code>smallestGroupSize &lt;- 2
+keep &lt;- rowSums(counts(dds) &gt;= 1) &gt;= smallestGroupSize
+dds &lt;- dds[keep,]
+vsd &lt;- vst(dds, blind=FALSE)
+pcaData &lt;- plotPCA(vsd, intgroup=c(&quot;Group&quot;, &quot;Sample.ID&quot;), returnData=TRUE)
+percentVar &lt;- round(100 * attr(pcaData, &quot;percentVar&quot;))
+ggplot(pcaData, aes(PC1, PC2, color=Group)) +
+  geom_point(size=3) +
+  xlab(paste0(&quot;PC1: &quot;,percentVar[1],&quot;% variance&quot;)) +
+  ylab(paste0(&quot;PC2: &quot;,percentVar[2],&quot;% variance&quot;)) + 
+  coord_fixed()  +  geom_text_repel(aes(label =  Sample.ID), show.legend = FALSE) +
+  theme_bw()</code></pre>
+<p><img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="using-deseq2-to-do-a-deg-analysis" class="section level2">
+<h2>Using DESeq2 to do a DEG analysis</h2>
+<pre class="r"><code>dds$Group &lt;- factor(dds$Group, levels = c(&quot;Control&quot;,&quot;UPF1&quot;, &quot;FRAX&quot;, &quot;FMR1&quot;))</code></pre>
+<pre class="r"><code>dds &lt;- DESeq(dds)
+
+res &lt;- results(dds, contrast=c(&quot;Group&quot;,&quot;UPF1&quot;,&quot;Control&quot;))
+
+
+gene_counts = list()
+thres_logFC = c( 0 ,log2(2), log2(1.5))
+
+for (thres in thres_logFC){
+  results = res  %&gt;% as.data.frame %&gt;% 
+   dplyr::filter(padj &lt; .05 &amp; abs(log2FoldChange) &gt; thres) %&gt;%  
+  with(.,  
+     table(sign.lfc=sign(log2FoldChange))) %&gt;% 
+    as.data.frame() %&gt;% 
+    mutate(LogFC = ifelse(sign.lfc == 1, &quot;Upregulated&quot;, &quot;Downregulated&quot;)) %&gt;% 
+    dplyr::select(-sign.lfc)
+  
+  gene_counts[[paste0(&quot;pvalue &lt; 0.05 &quot;, as.character(thres))]] = results 
+}
+
+
+
+for (thres in thres_logFC){
+  results = res  %&gt;% as.data.frame %&gt;% 
+   dplyr::filter(padj &lt; .005 &amp; abs(log2FoldChange) &gt; thres) %&gt;%  
+  with(.,  
+     table(sign.lfc=sign(log2FoldChange))) %&gt;% 
+    as.data.frame() %&gt;% 
+    mutate(LogFC = ifelse(sign.lfc == 1, &quot;Upregulated&quot;, &quot;Downregulated&quot;)) %&gt;% 
+    dplyr::select(-sign.lfc)
+  
+  gene_counts[[paste0(&quot;pvalue &lt; 0.005 &quot;, as.character(thres))]] = results 
+}
+
+
+gene_counts %&lt;&gt;% 
+  do.call(rbind, .) %&gt;% 
+  rownames_to_column(&quot;Threshold&quot;) %&gt;% 
+  mutate(Threshold = gsub(&quot;\\.[1-2].*&quot;, &quot;&quot;, Threshold)) </code></pre>
+<pre class="r"><code>gene_counts %&gt;% 
+  mutate(Freq = ifelse(LogFC == &quot;Downregulated&quot;, -Freq, Freq)) %&gt;%
+  
+  ggplot(aes(x= Threshold, y = Freq, fill = LogFC)) + geom_bar(stat = &quot;identity&quot;) + 
+  coord_flip() + 
+   scale_x_discrete(labels = c(&quot;pvalue &lt; 0.05 0&quot; = &quot;adj pvalue &lt; 0.05, no LogFC&quot;, 
+                                &quot;pvalue &lt; 0.05 0.584962500721156&quot; = &quot;adj pvalue &lt; 0.05, abs(logfc) &gt; log2(1.5)&quot;,
+                                 &quot;pvalue &lt; 0.05 1&quot; = &quot;adj pvalue &lt; 0.05, abs(logfc) &gt; log2(2)&quot;,
+                                &quot;pvalue &lt; 0.005 1&quot; = &quot;adj pvalue &lt; 0.005, abs(logfc) &gt; log2(2)&quot;,
+                                 &quot;pvalue &lt; 0.005 0.584962500721156&quot; = &quot;adj pvalue &lt; 0.005, abs(logfc) &gt; log2(1.5)&quot;,
+                                &quot;pvalue &lt; 0.005 0&quot; = &quot;adj pvalue &lt; 0.005, no LogFC&quot;)) + theme_bw() +
+  ylab(&quot;Number of DEGs&quot;) + ylim(-800, 800)</code></pre>
+<p><img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div
+id="using-alignment-data---there-may-be-bias-due-to-how-i-aligned-on-using-salmon"
+class="section level2">
+<h2>Using alignment data - there may be bias due to how I aligned on
+using Salmon</h2>
+<pre class="r"><code>salmon.files = (&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/UPF1_FMR1_for_Urwah&quot;)
+salmon = list.files(salmon.files, pattern = &quot;transcripts$&quot;, full.names = TRUE)
+all_files = file.path(salmon, &quot;quant.sf&quot;)
+sample_names = gsub(&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/UPF1_FMR1_for_Urwah/&quot;, &quot;&quot;, salmon)
+sample_names = gsub(&quot;_transcripts&quot;, &quot;&quot;, sample_names)
+names(all_files) &lt;- sample_names
+md = read.csv(here::here(&quot;data/Sample_info.csv&quot;), header= TRUE) %&gt;%  
+  #mutate(files = file.path(salmon, &quot;quant.sf&quot;)) %&gt;% 
+  dplyr::rename(&quot;names&quot; = &quot;GeneWiz.ID&quot;, 
+                &quot;Group&quot; = &quot;Sample.type&quot;) %&gt;% 
+  mutate(Group = ifelse(Group == &quot;MC&quot; | Group == &quot;FC&quot;, &quot;Control&quot;, Group)) %&gt;%
+  dplyr::select(names,everything())
+md$Sample.ID[26:27] = c(&quot;UPF1_61045&quot;, &quot;UPF1_FD61046&quot;)
+md$Sample.ID[31:32] = c(&quot;FC33_60921&quot;,&quot;FMR1_MM60955&quot;)
+
+
+md = md[order(match(md$Sample.ID, sample_names)),]
+md %&lt;&gt;% 
+  rownames_to_column(&quot;random&quot;) %&gt;% 
+#  column_to_rownames(&quot;names&quot;) %&gt;%
+  dplyr::select(-random) %&gt;%
+  mutate(files = all_files)</code></pre>
+<pre class="r"><code>library(VennDiagram)
+x = list( &quot;salmon&quot; = sample_names,
+          &quot;md&quot; = md$Sample.ID)
+#md$Sample.ID[26:27] = c(&quot;UPF1_61045&quot;, &quot;UPF1_FD61046&quot;)
+#md$Sample.ID[31:32] = c(&quot;FC33_60921&quot;,&quot;FMR1_MM60955&quot;)
+ggvenn(x[c(1,2)], fill_color = c(&quot;#2F124B&quot;, &quot;#801D2E&quot;),
+       set_name_color = &quot;black&quot;, text_color = &quot;white&quot;, text_size = 6,
+       stroke_size = 0.5, fill_alpha = 0.8,
+       stroke_color = &quot;white&quot;)</code></pre>
+<p><img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>#overlap= calculate.overlap(x=list(sample_names, md$names))</code></pre>
+<pre class="r"><code>txi_genes =  tximport(all_files, type=&quot;salmon&quot;, txOut=FALSE,
+                      countsFromAbundance=&quot;scaledTPM&quot;, tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
+#keep.genes = (rowSums(txi_genes$abundance &gt;= 10 ) &gt;= 2)</code></pre>
+<pre class="r"><code>dds &lt;- DESeqDataSetFromTximport(txi_genes,
+                                colData = md,
+                                design = ~ Sex + Batch + Group)</code></pre>
+<pre class="r"><code>#smallestGroupSize &lt;- 2
+#keep &lt;- rowSums(counts(dds) &gt;= 10) &gt;= smallestGroupSize
+#dds &lt;- dds[keep,]
+vsd &lt;- vst(dds, blind=FALSE)
+pcaData &lt;- plotPCA(vsd, intgroup=c(&quot;Group&quot;, &quot;Sample.ID&quot;), returnData=TRUE)
+percentVar &lt;- round(100 * attr(pcaData, &quot;percentVar&quot;))
+ggplot(pcaData, aes(PC1, PC2, color=Group)) +
+  geom_point(size=3) +
+  xlab(paste0(&quot;PC1: &quot;,percentVar[1],&quot;% variance&quot;)) +
+  ylab(paste0(&quot;PC2: &quot;,percentVar[2],&quot;% variance&quot;)) + 
+  coord_fixed()  +  geom_text_repel(aes(label =  Sample.ID), show.legend = FALSE) +
+  theme_bw()</code></pre>
+<p><img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>dds$Group &lt;- factor(dds$Group, levels = c(&quot;Control&quot;,&quot;UPF1&quot;, &quot;FRAX&quot;, &quot;FMR1&quot;))</code></pre>
+<pre class="r"><code>dds &lt;- DESeq(dds)
+
+res &lt;- results(dds, contrast=c(&quot;Group&quot;,&quot;UPF1&quot;,&quot;Control&quot;))
+
+gene_counts = list()
+thres_logFC = c( 0 ,log2(2), log2(1.5))
+
+for (thres in thres_logFC){
+  results = res  %&gt;% as.data.frame %&gt;% 
+   dplyr::filter(padj &lt; .05 &amp; abs(log2FoldChange) &gt; thres) %&gt;%  
+  with(.,  
+     table(sign.lfc=sign(log2FoldChange))) %&gt;% 
+    as.data.frame() %&gt;% 
+    mutate(LogFC = ifelse(sign.lfc == 1, &quot;Upregulated&quot;, &quot;Downregulated&quot;)) %&gt;% 
+    dplyr::select(-sign.lfc)
+  
+  gene_counts[[paste0(&quot;pvalue &lt; 0.05 &quot;, as.character(thres))]] = results 
+}
+
+
+
+for (thres in thres_logFC){
+  results = res  %&gt;% as.data.frame %&gt;% 
+   dplyr::filter(padj &lt; .005 &amp; abs(log2FoldChange) &gt; thres) %&gt;%  
+  with(.,  
+     table(sign.lfc=sign(log2FoldChange))) %&gt;% 
+    as.data.frame() %&gt;% 
+    mutate(LogFC = ifelse(sign.lfc == 1, &quot;Upregulated&quot;, &quot;Downregulated&quot;)) %&gt;% 
+    dplyr::select(-sign.lfc)
+  
+  gene_counts[[paste0(&quot;pvalue &lt; 0.005 &quot;, as.character(thres))]] = results 
+}
+
+
+gene_counts %&lt;&gt;% 
+  do.call(rbind, .) %&gt;% 
+  rownames_to_column(&quot;Threshold&quot;) %&gt;% 
+  mutate(Threshold = gsub(&quot;\\.[1-2].*&quot;, &quot;&quot;, Threshold)) </code></pre>
+<pre class="r"><code>gene_counts %&gt;% 
+  mutate(Freq = ifelse(LogFC == &quot;Downregulated&quot;, -Freq, Freq)) %&gt;%
+  
+  ggplot(aes(x= Threshold, y = Freq, fill = LogFC)) + geom_bar(stat = &quot;identity&quot;) + 
+  coord_flip() + 
+   scale_x_discrete(labels = c(&quot;pvalue &lt; 0.05 0&quot; = &quot;adj pvalue &lt; 0.05, no LogFC&quot;, 
+                                &quot;pvalue &lt; 0.05 0.584962500721156&quot; = &quot;adj pvalue &lt; 0.05, abs(logfc) &gt; log2(1.5)&quot;,
+                                 &quot;pvalue &lt; 0.05 1&quot; = &quot;adj pvalue &lt; 0.05, abs(logfc) &gt; log2(2)&quot;,
+                                &quot;pvalue &lt; 0.005 1&quot; = &quot;adj pvalue &lt; 0.005, abs(logfc) &gt; log2(2)&quot;,
+                                 &quot;pvalue &lt; 0.005 0.584962500721156&quot; = &quot;adj pvalue &lt; 0.005, abs(logfc) &gt; log2(1.5)&quot;,
+                                &quot;pvalue &lt; 0.005 0&quot; = &quot;adj pvalue &lt; 0.005, no LogFC&quot;)) + theme_bw() +
+  ylab(&quot;Number of DEGs&quot;) + ylim(-1000, 1000)</code></pre>
+<p><img src="figure/Exploratory-DEG.Rmd/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" /></p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.2.2 Patched (2022-11-10 r83330)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 22.04.3 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
+
+locale:
+ [1] LC_CTYPE=en_AU.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_AU.UTF-8        LC_COLLATE=en_AU.UTF-8    
+ [5] LC_MONETARY=en_AU.UTF-8    LC_MESSAGES=en_AU.UTF-8   
+ [7] LC_PAPER=en_AU.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_AU.UTF-8 LC_IDENTIFICATION=C       
+
+attached base packages:
+ [1] grid      stats4    tools     stats     graphics  grDevices utils    
+ [8] datasets  methods   base     
+
+other attached packages:
+ [1] VennDiagram_1.7.3           futile.logger_1.4.3        
+ [3] ggrepel_0.9.3               EnsDb.Hsapiens.v86_2.99.0  
+ [5] gridExtra_2.3               naniar_1.0.0               
+ [7] glmpca_0.2.0                broom_1.0.5                
+ [9] cowplot_1.1.1               glue_1.6.2                 
+[11] ggfortify_0.4.16            stargazer_5.2.3            
+[13] ngsReports_2.0.3            patchwork_1.1.3            
+[15] AnnotationHub_3.6.0         BiocFileCache_2.6.1        
+[17] dbplyr_2.3.3                openxlsx_4.2.5.2           
+[19] ggiraph_0.8.7               DT_0.28                    
+[21] msigdb_1.6.0                GSEABase_1.60.0            
+[23] graph_1.76.0                annotate_1.76.0            
+[25] XML_3.99-0.14               pheatmap_1.0.12            
+[27] ggvenn_0.1.10               MetBrewer_0.2.0            
+[29] ggpubr_0.6.0                venn_1.11                  
+[31] viridis_0.6.4               viridisLite_0.4.2          
+[33] tximeta_1.16.1              tximport_1.26.1            
+[35] goseq_1.50.0                geneLenDataBase_1.34.0     
+[37] BiasedUrn_2.0.11            org.Mm.eg.db_3.16.0        
+[39] EnsDb.Mmusculus.v79_2.99.0  ensembldb_2.22.0           
+[41] AnnotationFilter_1.22.0     GenomicFeatures_1.50.4     
+[43] AnnotationDbi_1.60.2        biomaRt_2.54.1             
+[45] edgeR_3.40.2                limma_3.54.2               
+[47] DESeq2_1.38.3               SummarizedExperiment_1.28.0
+[49] Biobase_2.58.0              MatrixGenerics_1.10.0      
+[51] matrixStats_1.0.0           GenomicRanges_1.50.2       
+[53] GenomeInfoDb_1.34.9         IRanges_2.32.0             
+[55] S4Vectors_0.36.2            BiocGenerics_0.44.0        
+[57] corrplot_0.92               lubridate_1.9.2            
+[59] forcats_1.0.0               purrr_1.0.2                
+[61] readr_2.1.4                 tidyverse_2.0.0            
+[63] stringr_1.5.0               tidyr_1.3.0                
+[65] scales_1.2.1                data.table_1.14.8          
+[67] readxl_1.4.3                tibble_3.2.1               
+[69] magrittr_2.0.3              reshape2_1.4.4             
+[71] ggplot2_3.4.3               dplyr_1.1.2                
+[73] workflowr_1.7.1            
+
+loaded via a namespace (and not attached):
+  [1] utf8_1.2.3                    tidyselect_1.2.0             
+  [3] RSQLite_2.3.1                 htmlwidgets_1.6.2            
+  [5] BiocParallel_1.32.6           munsell_0.5.0                
+  [7] codetools_0.2-19              withr_2.5.0                  
+  [9] colorspace_2.1-0              filelock_1.0.2               
+ [11] uuid_1.1-1                    highr_0.10                   
+ [13] knitr_1.43                    rstudioapi_0.15.0            
+ [15] ggsignif_0.6.4                labeling_0.4.2               
+ [17] git2r_0.32.0                  GenomeInfoDbData_1.2.9       
+ [19] farver_2.1.1                  bit64_4.0.5                  
+ [21] rprojroot_2.0.3               vctrs_0.6.3                  
+ [23] generics_0.1.3                lambda.r_1.2.4               
+ [25] xfun_0.40                     timechange_0.2.0             
+ [27] R6_2.5.1                      locfit_1.5-9.8               
+ [29] bitops_1.0-7                  cachem_1.0.8                 
+ [31] DelayedArray_0.24.0           vroom_1.6.3                  
+ [33] promises_1.2.1                BiocIO_1.8.0                 
+ [35] gtable_0.3.4                  processx_3.8.2               
+ [37] rlang_1.1.1                   systemfonts_1.0.4            
+ [39] splines_4.2.2                 rtracklayer_1.58.0           
+ [41] rstatix_0.7.2                 lazyeval_0.2.2               
+ [43] BiocManager_1.30.22           yaml_2.3.7                   
+ [45] abind_1.4-5                   backports_1.4.1              
+ [47] httpuv_1.6.11                 ellipsis_0.3.2               
+ [49] jquerylib_0.1.4               RColorBrewer_1.1-3           
+ [51] ggdendro_0.1.23               Rcpp_1.0.11                  
+ [53] plyr_1.8.8                    progress_1.2.2               
+ [55] zlibbioc_1.44.0               RCurl_1.98-1.12              
+ [57] ps_1.7.5                      prettyunits_1.1.1            
+ [59] zoo_1.8-12                    here_1.0.1                   
+ [61] fs_1.6.3                      futile.options_1.0.1         
+ [63] whisker_0.4.1                 ProtGenerics_1.30.0          
+ [65] hms_1.1.3                     mime_0.12                    
+ [67] evaluate_0.21                 xtable_1.8-4                 
+ [69] compiler_4.2.2                crayon_1.5.2                 
+ [71] htmltools_0.5.6               mgcv_1.9-0                   
+ [73] later_1.3.1                   tzdb_0.4.0                   
+ [75] visdat_0.6.0                  geneplotter_1.76.0           
+ [77] DBI_1.1.3                     formatR_1.14                 
+ [79] MASS_7.3-60                   rappdirs_0.3.3               
+ [81] Matrix_1.6-1                  car_3.1-2                    
+ [83] cli_3.6.1                     parallel_4.2.2               
+ [85] pkgconfig_2.0.3               getPass_0.2-2                
+ [87] GenomicAlignments_1.34.1      plotly_4.10.2                
+ [89] xml2_1.3.5                    bslib_0.5.1                  
+ [91] admisc_0.33                   XVector_0.38.0               
+ [93] callr_3.7.3                   digest_0.6.33                
+ [95] Biostrings_2.66.0             rmarkdown_2.24               
+ [97] cellranger_1.1.0              restfulr_0.0.15              
+ [99] curl_5.0.2                    shiny_1.7.5                  
+[101] Rsamtools_2.14.0              rjson_0.2.21                 
+[103] lifecycle_1.0.3               nlme_3.1-163                 
+[105] jsonlite_1.8.7                carData_3.0-5                
+[107] fansi_1.0.4                   pillar_1.9.0                 
+[109] lattice_0.21-8                KEGGREST_1.38.0              
+[111] fastmap_1.1.1                 httr_1.4.7                   
+[113] GO.db_3.16.0                  interactiveDisplayBase_1.36.0
+[115] zip_2.3.0                     png_0.1-8                    
+[117] pander_0.6.5                  BiocVersion_3.16.0           
+[119] bit_4.0.5                     stringi_1.7.12               
+[121] sass_0.4.7                    blob_1.2.4                   
+[123] memoise_2.0.1                </code></pre>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

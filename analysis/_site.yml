@@ -9,10 +9,12 @@ navbar:
     href: about.html
   - text: License
     href: license.html
+  - text: Exploratory QC
+    href: Quality-control.html
   right:
   - icon: fab fa-github
     text: Source code
-    href: https://github.com/unawaz1996/UPF1-FMR1
+    href: https://github.com/urwahnawaz/UPF1-FMR1
 output:
   workflowr::wflow_html:
     toc: yes
