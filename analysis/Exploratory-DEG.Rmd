@@ -571,8 +571,19 @@ volc = volc + geom_text_repel(data=subset(res , SYMBOL %in% c("UPF1", "UPF2", "U
                       "GADD5G")),
             aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
              vjust=-0.40, color = "black", box.padding = 0.5, fill = "white")
-volc
+volc + ggtitle("UPF1 relative to controls using DESEq2")
 ```
+
+
+
+```{r}
+ res  %>% 
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, log2FoldChange, padj) %>% 
+  dplyr::arrange(padj) %>% 
+  DT::datatable(caption="DEGs in UPF1 relative to controls using the DESeq2 pipeline") 
+```
+
 
 
 Overlap of limma and deseq2 results
