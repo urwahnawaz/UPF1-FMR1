@@ -11,6 +11,8 @@ navbar:
     href: license.html
   - text: Exploratory QC
     href: Quality-control.html
+  - text: Gene expression
+    href: Exploratory-DEG.html
   right:
   - icon: fab fa-github
     text: Source code

@@ -24,8 +24,11 @@ knitr::opts_chunk$set(
 ```
 
 
+## Introduction
+
+
 ```{r}
-source("/home/neuro/Documents/NMD_analysis/Analysis/UPF1-FMR1/code/libraries.R")
+source(here::here("code/libraries.R"))
 library(stargazer)
 library(ggfortify)
 library(glue)
@@ -36,17 +39,45 @@ library(naniar)
 library(gridExtra)
 library(EnsDb.Hsapiens.v86)
 library(ggrepel)
-library(tibble)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+
+goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
+    readRDS() %>%
+    mutate(ontology = as.character(ontology))
 ```
+
 
 ```{r}
 txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
 tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
 ```
 
-## Introduction - Urwah's analysis
 
-This includes my preprocessing using Salmon 
+
+```{r}
+ah <- AnnotationHub() %>%
+    subset(species == "Mus musculus") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCm39")
+ensDb <- ah[["AH104895"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)
+
+mcols(transGR) = mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+```
+
+
 
 ```{r}
 salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon")
@@ -71,108 +102,391 @@ md %<>%
   mutate(files = all_files)
 
 md %<>% dplyr::filter(Group != "FMR1") %>%
- dplyr::filter(names != "23-LDJ6767")
-
+ dplyr::filter(names != "23-LDJ6767") %>%
+dplyr::filter(names != "202")
 all_files = all_files[names(all_files) %in% md$names]
-#comparisons = unique(md$Group)[-1]
-#md$names = as.character(md$names)
 ```
-
-
 
 
 ```{r}
 txi_genes =  tximport(all_files, type="salmon", txOut=FALSE,
                       countsFromAbundance="scaledTPM", tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
 keep.genes = (rowSums(txi_genes$abundance >= 1 ) >= 3)
+
 ```
 
 
-## Principal component analysis 
-
-- Controls only 
+# Limma and voom
 
 ```{r}
+txi_genes_filtered = txi_genes$counts[keep.genes,]
+y <- DGEList(txi_genes_filtered)
 
-md_controls = md %>% dplyr::filter(Group == "Control")
-controls = txi_genes$abundance %>% 
-  as.data.frame() %>% 
-  dplyr::select(contains(md_controls$names))
 
-pca = log2(controls[keep.genes,]  + 0.05) %>%
-    t() %>% 
-    prcomp(scale = FALSE)
+design <- model.matrix(~Batch +Group + Sex, data = md) %>% 
+    set_colnames(gsub(pattern = "Group", replacement ="", x = colnames(.)))
+
+y <- calcNormFactors(y)
+v <- voom(y, design)
+
+fit = lmFit(v, design) %>% 
+    eBayes()
+
+```
+ 
+Using the limma/voom pipeline, the total number of DEGs across groups: 
+
+
+```{r}
+summary(decideTests(fit, lfc =0))
 ```
 
-- PCA using salmon abundance
-```{r fig.cap="Principal component analysis"}
-pcaVars <- percent_format(0.1)(summary(pca)$importance["Proportion of Variance",]) 
 
-gene_pca = pca$x[,1:2] %>% 
-    as.data.frame()  %>%
-   rownames_to_column("names") %>%
-    left_join(md, by= "names") %>% 
-    as.tibble() %>%
-    ggplot(aes(PC1, PC2, color = Group, shape = as.character(Batch))) +
-    geom_point(size = 8) +
-    theme_bw() + 
-   geom_text_repel(aes(label = Sample.ID), show.legend = FALSE) +
-    theme(axis.title.y = element_text(size = 12), axis.title.x = element_text(size = 12), 
-          axis.text = element_text(size = 10)) +
-  labs(x = paste0("PC1 (", pcaVars[["PC1"]], ")"),
-    y = paste0("PC2 (", pcaVars[["PC2"]], ")"))
-
-gene_pca
+```{r}
+upf1_results_lfc = topTable(fit,coef = "UPF1", number = Inf) %>% 
+                     mutate(res = ifelse(logFC > 0& adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
 ```
 
 ```{r}
-log_gene_cor = cor(log2(controls[keep.genes,]  + 0.05))
-log_gene_cor[log_gene_cor==1] <- NA
-gene = rowMeans(log_gene_cor, na.rm = TRUE) %>% scale() %>% as.data.frame() %>%
-  set_colnames("gene")
+frax_results_lfc = topTable(fit,coef = "FRAX", number = Inf) %>% 
+                     mutate(res = ifelse(logFC > 0  & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+```
 
-gene %>% 
-  rownames_to_column("names") %>%
-  left_join(md, by = "names") %>%
-  DT::datatable()
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  dplyr::arrange(adj.P.Val) %>% 
+  DT::datatable(caption="DEGS in UPF1 relative to controls using limma/voom pipeline") 
+```
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
+
+DEColours <- c("Downregulated" = "#38A6A5","Upregulated" = "#CC503E",  "NotSig" = "#E5E5E5")
+
+
+volc = upf1_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = c(-log2(2), log2(2)), size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 12)
+
+
+volc = volc + geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5, fill = "white") + ggtitle("DEGs in UPF1 relative to controls using limma/voom")
+
+
+volc 
 ```
 
 
 
-- PCA using DESeq2 VST transformation as in Clare 
+```{r}
+frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  dplyr::arrange(adj.P.Val) %>% 
+  DT::datatable(caption="DEGs in FRAX relative to controls using limma/voom pipeline") 
+```
+
+
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
+
+DEColours <- c("Downregulated" = "#38A6A5","Upregulated" = "#CC503E",  "NotSig" = "#E5E5E5")
+
+
+volc = frax_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = c(-log2(2), log2(2)), size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 12)
+
+
+volc = volc + geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G", "FMR1")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5, fill = "white") + ggtitle("DEGs in FRAX relative to controls using limma/voom pipeline")
+
+
+volc 
+```
+
+
+### Overlap between FRAX and UPF1 genes 
+
+Using the DEGs from limma pipeline, I performed a correlation analysis of FRAX DEGs with UPF1 DEGs, with respect to their relative log 2 fold change. Overall, a strong correlation (r = 0.95) was observed for this analysis 
+
+```{r fig.cap="Overlap of significant genes from FRAX and UPF1"}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc %>% 
+               dplyr::filter(adj.P.Val < 0.05) %>%
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
+  ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") 
+
+```
+
+
+
+<!-- ```{r fig.cap="Overlap of significant UPF1 significant genes with FRAX"} -->
+<!-- upf1_results_lfc %>%  -->
+<!--   dplyr::filter(adj.P.Val < 0.05) %>% -->
+<!--   dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>%  -->
+<!--   left_join(frax_results_lfc %>%  -->
+<!--                 mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated",  -->
+<!--                       ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% -->
+<!--                dplyr::filter(res == "NotSig") %>% -->
+<!--                 dplyr::select(ensembl_gene_id, FRAX.logFC=logFC,  -->
+<!--                               FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>%  -->
+<!--   ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",  -->
+<!--               size=5, alpha =0.6,  -->
+<!--               conf.int = TRUE, add.params = list(color = "#EF3829", -->
+<!--                                                  fill = "lightgray")) +  -->
+<!--     theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") + -->
+<!--   geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") + -->
+<!--   geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60")  -->
+
+<!-- ``` -->
+
+
+
+```{r}
+fgsea_ranks <- topTable(fit, coef = "UPF1", number = Inf) %>%
+                rownames_to_column("ensemblID") %>%
+                mutate(rankstat = sign(logFC)*-log10(P.Value)) %>%
+                arrange(desc(rankstat)) %>%
+  with(
+    structure(rankstat, names = ensemblID)
+  )
+```
+
+```{r}
+mh=  msigdbr("Homo sapiens", category = "H")
+#   distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>%
+#   dplyr::rename(ensemblID = ensembl_gene) %>%
+#         #dplyr::inner_join(ens2Entrez) %>%
+#         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+#         split(f = .$gs_name) %>%
+#         lapply(extract2, "ensemblID")
+
+ 
+msigdb_H = msigdbr(species = "Homo sapiens",  category = "H") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
+```
+
+
+```{r}
+gseaResults_h_limma = fgseaMultilevel(msigdb_H,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+
+```{r}
+gseaResults_h_limma %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+```
+
+```{r}
+limma_h = gseaResults_h_limma %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + theme_pubclean() + coord_flip() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") +
+  geom_hline(yintercept = 0) + ggtitle("Hallmark results using limma")
+```
+
+
+
+
+```{r}
+msigdb_C5 = msigdbr(species = "Homo sapiens",  category = "C5", subcategory = "GO:BP") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene,
+                 id = gs_exact_source) %>% 
+  left_join(goSummaries, by = "id") %>% 
+  dplyr::filter(shortest_path > 4) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+```
+
+```{r}
+gseaResults_c5_limma = fgseaMultilevel(msigdb_C5,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+```{r}
+gseaResults_c5_limma %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+
+```
+
+```{r fig.height=10,fig.wdith=15, fig.cap="Gene set enrichment analysis of UPF1 variants using C5 Biological processes geneset"}
+limma_c5= gseaResults_c5_limma %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") + ggtitle("GO BP results using limma")
+
+```
+
+
+
+```{r}
+msigdb_C2 = msigdbr(species = "Homo sapiens",  category = "C2", subcategory = "REACTOME") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>% 
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+gseaResults_reactome_limma = fgseaMultilevel(msigdb_C2,fgsea_ranks) %>% 
+ # mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+
+```
+
+
+
+```{r}
+gseaResults_reactome_limma %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+
+```
+
+```{r fig.height=10,fig.width=20, fig.cap="Gene set enrichment analysis of UPF1 variants using REACTOME geneset"}
+ limma_reactome =gseaResults_reactome_limma  %>%
+  dplyr::arrange(padj) %>%
+  head(20) %>%
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") + ggtitle("Reactome results using limma")
+```
+
+
+# Using DESeq2 
+ 
 
 ```{r}
 dds <- DESeqDataSetFromTximport(txi_genes,
                                 colData = md,
-                                design = ~ Group + Batch + Sex)
-```
+                                design = ~Batch +Group + Sex)
 
-```{r}
-smallestGroupSize <- 2
-keep <- rowSums(counts(dds) >= 1) >= smallestGroupSize
-dds <- dds[keep,]
-vsd <- vst(dds, blind=FALSE)
-pcaData <- plotPCA(vsd, intgroup=c("Group", "Sample.ID"), returnData=TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-ggplot(pcaData, aes(PC1, PC2, color=Group)) +
-  geom_point(size=3) +
-  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
-  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
-  coord_fixed()  +  geom_text_repel(aes(label =  Sample.ID), show.legend = FALSE) +
-  theme_bw()
-```
-
-
-## Using DESeq2 to do a DEG analysis
-
-```{r}
-dds$Group <- factor(dds$Group, levels = c("Control","UPF1", "FRAX", "FMR1"))
-```
-
-```{r}
+#smallestGroupSize <- 3
+#keep <- rowSums(counts(dds) >= 20) >= smallestGroupSize
+dds <- dds[keep.genes,]
 dds <- DESeq(dds)
 
-res <- results(dds, contrast=c("Group","UPF1","Control"))
+res <- results(dds, contrast=c("Group","UPF1","Control")) %>%
+  as.data.frame() %>%
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
 
 
 gene_counts = list()
@@ -212,8 +526,7 @@ gene_counts %<>%
 
 ```
 
-
-```{r}
+```{r fig.height=6, fig.cap="Number of up and down DEGs with different thresholds"}
 gene_counts %>% 
   mutate(Freq = ifelse(LogFC == "Downregulated", -Freq, Freq)) %>%
   
@@ -225,145 +538,398 @@ gene_counts %>%
                                 "pvalue < 0.005 1" = "adj pvalue < 0.005, abs(logfc) > log2(2)",
                                  "pvalue < 0.005 0.584962500721156" = "adj pvalue < 0.005, abs(logfc) > log2(1.5)",
                                 "pvalue < 0.005 0" = "adj pvalue < 0.005, no LogFC")) + theme_bw() +
-  ylab("Number of DEGs") + ylim(-800, 800)
-```
-
-## Using alignment data - there may be bias due to how I aligned on using Salmon 
-
-```{r}
-salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/UPF1_FMR1_for_Urwah")
-salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
-all_files = file.path(salmon, "quant.sf")
-sample_names = gsub("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/UPF1_FMR1_for_Urwah/", "", salmon)
-sample_names = gsub("_transcripts", "", sample_names)
-names(all_files) <- sample_names
-md = read.csv(here::here("data/Sample_info.csv"), header= TRUE) %>%  
-  #mutate(files = file.path(salmon, "quant.sf")) %>% 
-  dplyr::rename("names" = "GeneWiz.ID", 
-                "Group" = "Sample.type") %>% 
-  mutate(Group = ifelse(Group == "MC" | Group == "FC", "Control", Group)) %>%
-  dplyr::select(names,everything())
-md$Sample.ID[26:27] = c("UPF1_61045", "UPF1_FD61046")
-md$Sample.ID[31:32] = c("FC33_60921","FMR1_MM60955")
-
-
-md = md[order(match(md$Sample.ID, sample_names)),]
-md %<>% 
-  rownames_to_column("random") %>% 
-#  column_to_rownames("names") %>%
-  dplyr::select(-random) %>%
-  mutate(files = all_files)
-
-
-```
-
-```{r}
-library(VennDiagram)
-x = list( "salmon" = sample_names,
-          "md" = md$Sample.ID)
-#md$Sample.ID[26:27] = c("UPF1_61045", "UPF1_FD61046")
-#md$Sample.ID[31:32] = c("FC33_60921","FMR1_MM60955")
-ggvenn(x[c(1,2)], fill_color = c("#2F124B", "#801D2E"),
-       set_name_color = "black", text_color = "white", text_size = 6,
-       stroke_size = 0.5, fill_alpha = 0.8,
-       stroke_color = "white")
-
-
-#overlap= calculate.overlap(x=list(sample_names, md$names))
+  ylab("Number of DEGs") 
 ```
 
 
-```{r}
-txi_genes =  tximport(all_files, type="salmon", txOut=FALSE,
-                      countsFromAbundance="scaledTPM", tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
-#keep.genes = (rowSums(txi_genes$abundance >= 10 ) >= 2)
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using DESeq2"}
+DEColours <- c("Downregulated" = "#38A6A5","Upregulated" = "#CC503E",  "NotSig" = "#E5E5E5")
+
+
+volc = res  %>%
+  mutate(res = ifelse(log2FoldChange> 0 & padj < 0.05, "Upregulated", 
+                      ifelse(log2FoldChange < 0 & padj < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(padj), 
+               x =  log2FoldChange , 
+               colour = res,
+               size =-log10(padj), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = c(-log2(2), log2(2)), size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 12)
+
+
+volc = volc + geom_text_repel(data=subset(res , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5, fill = "white")
+volc
 ```
 
+
+Overlap of limma and deseq2 results
+
+
+
 ```{r}
-dds <- DESeqDataSetFromTximport(txi_genes,
-                                colData = md,
-                                design = ~ Sex + Batch + Group)
+all.limma = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05)
+
+all.deseq2 = res %>% 
+  dplyr::filter(padj < 0.05)
+
+upreg.limma = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC > 0)
+upreg.deseq2 = res %>% 
+  dplyr::filter(padj < 0.05 & log2FoldChange > 0)
+
+dreg.limma = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC <0 )
+dreg.deseq2= res %>% 
+  dplyr::filter(padj < 0.05 & log2FoldChange < 0)
+
+x = list( "all limma/voom" = all.limma$ensembl_gene_id,
+    "all DESeq2" = all.deseq2$ensembl_gene_id, 
+    "upregulated (limma)" = upreg.limma$ensembl_gene_id, 
+    "upregulated (deseq2)" = upreg.deseq2$ensembl_gene_id,
+    "downregulated (limma)"= dreg.limma$ensembl_gene_id,
+    "downregulated (deseq2)"= dreg.deseq2$ensembl_gene_id)
+
+
+
 ```
 
-How is NMD involved in activity dependent gene expression
-ADGE --> memeory and learning
-What is the impact of suppressed NMD in gene expression
-UPF1 was chosen to model that effect 
+- All 
+
 ```{r}
-#smallestGroupSize <- 2
-#keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
-#dds <- dds[keep,]
-vsd <- vst(dds, blind=FALSE)
-pcaData <- plotPCA(vsd, intgroup=c("Group", "Sample.ID"), returnData=TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-ggplot(pcaData, aes(PC1, PC2, color=Group)) +
-  geom_point(size=3) +
-  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
-  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
-  coord_fixed()  +  geom_text_repel(aes(label =  Sample.ID), show.legend = FALSE) +
-  theme_bw()
+ggvenn(x[c(1,2)])
+```
+
+- Upreg
+
+```{r}
+ggvenn(x[c(3,4)])
+
+```
+- Down
+```{r}
+ggvenn(x[c(5,6)])
+
+```
+
+
+Correlation of significant genes from both datasets
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>% 
+  dplyr::select(ensembl_gene_id, logFC) %>% 
+  full_join(res %>% 
+             dplyr::filter(padj < 0.05) %>%
+              dplyr::select(ensembl_gene_id, log2FoldChange), by = "ensembl_gene_id") %>% 
+    ggscatter(., x="logFC", y = "log2FoldChange", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("UPF1 DESeq2") + xlab("UPF1 Limma") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") 
+
+```
+
+
+
+## Comparison with FRAX 
+
+```{r}
+res_frax <- results(dds, contrast=c("Group","FRAX","Control")) %>%
+  as.data.frame() %>%
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+
+```
+
+```{r fig.cap="Overlap of significant genes from FRAX and UPF1 using DESeq2"}
+res %>% 
+  dplyr::filter(padj  < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, log2FoldChange, padj) %>% 
+  inner_join(res_frax %>% 
+               dplyr::filter(padj  < 0.05) %>%
+                dplyr::select(ensembl_gene_id, FRAX.logFC=log2FoldChange, 
+                              FRAX.padj =padj), by = "ensembl_gene_id") %>% 
+  ggscatter(., x="log2FoldChange", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") 
+
+```
+
+## Gene set enrichment analysis 
+
+- Performing fgsea with deseq2
+
+```{r}
+fgsea_ranks <- res %>%
+                mutate(rankstat = sign(log2FoldChange)*-log10(pvalue)) %>%
+                arrange(desc(rankstat)) %>%
+  with(
+    structure(rankstat, names = ensembl_gene_id)
+  )
+
+fgsea_ranks=  fgsea_ranks [is.finite(fgsea_ranks)]
 ```
 
 
 ```{r}
-dds$Group <- factor(dds$Group, levels = c("Control","UPF1", "FRAX", "FMR1"))
+gseaResults_h = fgseaMultilevel(msigdb_H,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
 ```
 
+
 ```{r}
-dds <- DESeq(dds)
-res <- lfcShrink(dds, coef="Type_UPF1_vs_CTRL", type="apeglm")
-
-res <- results(dds, contrast=c("Group","UPF1","Control"))
-
-gene_counts = list()
-thres_logFC = c( 0 ,log2(2), log2(1.5))
-
-for (thres in thres_logFC){
-  results = res  %>% as.data.frame %>% 
-   dplyr::filter(padj < .05 & abs(log2FoldChange) > thres) %>%  
-  with(.,  
-     table(sign.lfc=sign(log2FoldChange))) %>% 
-    as.data.frame() %>% 
-    mutate(LogFC = ifelse(sign.lfc == 1, "Upregulated", "Downregulated")) %>% 
-    dplyr::select(-sign.lfc)
+gseaResults_h %<>% 
+ # left_join(c2, by="gs_name")
   
-  gene_counts[[paste0("pvalue < 0.05 ", as.character(thres))]] = results 
-}
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
 
 
+```
 
-for (thres in thres_logFC){
-  results = res  %>% as.data.frame %>% 
-   dplyr::filter(padj < .005 & abs(log2FoldChange) > thres) %>%  
-  with(.,  
-     table(sign.lfc=sign(log2FoldChange))) %>% 
-    as.data.frame() %>% 
-    mutate(LogFC = ifelse(sign.lfc == 1, "Upregulated", "Downregulated")) %>% 
-    dplyr::select(-sign.lfc)
+```{r fig.height=10, fig.cap="Gene set enrichment analysis of UPF1 variants using Hallmark geneset"}
+deseq2_h = gseaResults_h %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + theme_pubclean() + coord_flip() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") +
+  geom_hline(yintercept = 0) +  ggtitle("Hallmark results using DESeq2")
+```
+
+```{r}
+msigdb_C5 = msigdbr(species = "Homo sapiens",  category = "C5", subcategory = "GO:BP") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene,
+                 id = gs_exact_source) %>% 
+  left_join(goSummaries, by = "id") %>% 
+  dplyr::filter(shortest_path > 4) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+```
+
+```{r}
+gseaResults_c5 = fgseaMultilevel(msigdb_C5,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+```{r}
+gseaResults_c5 %<>% 
+ # left_join(c2, by="gs_name")
   
-  gene_counts[[paste0("pvalue < 0.005 ", as.character(thres))]] = results 
-}
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
 
 
-gene_counts %<>% 
-  do.call(rbind, .) %>% 
-  rownames_to_column("Threshold") %>% 
-  mutate(Threshold = gsub("\\.[1-2].*", "", Threshold)) 
+```
+
+```{r fig.height=10,fig.wdith=15, fig.cap="Gene set enrichment analysis of UPF1 variants using C5 Biological processes geneset"}
+deseq2_c5 = gseaResults_c5 %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") + ggtitle("Gene ontology biological processes results using DESeq2")
+
+```
+
+- Reactome 
+
+```{r}
+msigdb_C2 = msigdbr(species = "Homo sapiens",  category = "C2", subcategory = "REACTOME") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>% 
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+gseaResults_reactome = fgseaMultilevel(msigdb_C2,fgsea_ranks) %>% 
+ # mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+
+```
+
+
+
+```{r}
+gseaResults_reactome %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+
+```
+
+```{r}
+ deseq2_reactome = gseaResults_reactome  %>%
+  dplyr::arrange(padj) %>%
+  head(20) %>%
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") + ggtitle("Reactome results using DESeq2")
+```
+
+
+```{r fig.cap = "Hallmark gene sets", fig.width=15, fig.height=10}
+ggarrange(limma_h , deseq2_h, nol=2)
+```
+```{r}
+gseaResults_h_limma %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using limma/voom. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+```{r}
+gseaResults_h %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using DESeq2. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+
+```
+
+```{r fig.cap = "GO:BP gene sets", fig.width=15, fig.height =10}
+ggarrange(limma_c5 , deseq2_c5, nol=2)
+
+```
+
+```{r}
+gseaResults_c5_limma  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using limma/voom. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
 ```
 
 ```{r}
 
-gene_counts %>% 
-  mutate(Freq = ifelse(LogFC == "Downregulated", -Freq, Freq)) %>%
-  
-  ggplot(aes(x= Threshold, y = Freq, fill = LogFC)) + geom_bar(stat = "identity") + 
-  coord_flip() + 
-   scale_x_discrete(labels = c("pvalue < 0.05 0" = "adj pvalue < 0.05, no LogFC", 
-                                "pvalue < 0.05 0.584962500721156" = "adj pvalue < 0.05, abs(logfc) > log2(1.5)",
-                                 "pvalue < 0.05 1" = "adj pvalue < 0.05, abs(logfc) > log2(2)",
-                                "pvalue < 0.005 1" = "adj pvalue < 0.005, abs(logfc) > log2(2)",
-                                 "pvalue < 0.005 0.584962500721156" = "adj pvalue < 0.005, abs(logfc) > log2(1.5)",
-                                "pvalue < 0.005 0" = "adj pvalue < 0.005, no LogFC")) + theme_bw() +
-  ylab("Number of DEGs") + ylim(-1000, 1000)
+gseaResults_c5  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using DESeq2. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
 
+```{r fig.cap = "Reactome gene sets", fig.width=12, fig.height=25}
+ggarrange(limma_reactome , deseq2_reactome, nrow=2)
+
+```
+
+
+```{r}
+gseaResults_reactome_limma  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using limma/voom. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+
+```{r}
+gseaResults_reactome  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes using DESeq2. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
 ```

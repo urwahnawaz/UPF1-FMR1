@@ -36,6 +36,12 @@ library(gridExtra)
 library(EnsDb.Hsapiens.v86)
 library(ggrepel)
 library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+
+goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
+    readRDS() %>%
+    mutate(ontology = as.character(ontology))
 ```
 
 
@@ -335,7 +341,7 @@ group_cols <- hcl.colors(
 
 ## Genotype check 
 
-```{r, fig.height = 6, fig.width=10, fig.cap="All samples demonstrated the expected expression patterns, no mislabeling was detected in the dataset."}
+```{r fig.height = 6, fig.width=10, fig.cap="All samples demonstrated the expected expression patterns, no mislabeling was detected in the dataset."}
 group.labs <- c("Control", "FRAX", "UPF1")
 names(group.labs) <- unique(md$Group)
 
@@ -633,7 +639,7 @@ gene_pca
 ```
 
 
-```{r fig.height = 10, fig.width=15}
+```{r fig.height= 10, fig.width=15}
 pca_all = ggarrange(gene_pca, trans_pca , ncol=2,  common.legend = TRUE, legend="right")
 ```
 
@@ -833,8 +839,11 @@ v <- voom(y, design)
 fit = lmFit(v, design) %>% 
     eBayes()
 
+```
 
-summary(decideTests(fit, lfc =1))
+
+```{r}
+summary(decideTests(fit, lfc =0))
 ```
 
 
@@ -851,7 +860,262 @@ upf1_results_lfc %>% DT::datatable()
 ```
 
 
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
 
+DEColours <- c("Downregulated" = "#38A6A5","Upregulated" = "#CC503E",  "NotSig" = "#E5E5E5")
+
+
+volc = upf1_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = c(-log2(2), log2(2)), size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 12)
+
+
+volc = volc + geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5, fill = "white")
+
+
+volc 
+```
+
+- fgsea 
+
+
+```{r}
+fgsea_ranks <- topTable(fit, coef = "UPF1", number = Inf) %>%
+                rownames_to_column("ensemblID") %>%
+                mutate(rankstat = sign(logFC)*-log10(P.Value)) %>%
+                arrange(desc(rankstat)) %>%
+  with(
+    structure(rankstat, names = ensemblID)
+  )
+```
+
+```{r}
+mh=  msigdbr("Homo sapiens", category = "H")
+#   distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>%
+#   dplyr::rename(ensemblID = ensembl_gene) %>%
+#         #dplyr::inner_join(ens2Entrez) %>%
+#         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+#         split(f = .$gs_name) %>%
+#         lapply(extract2, "ensemblID")
+
+ 
+msigdb_H = msigdbr(species = "Homo sapiens",  category = "H") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
+```
+
+
+```{r}
+gseaResults_h = fgseaMultilevel(msigdb_H,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+
+```{r}
+gseaResults_h %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_h %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+
+```
+
+```{r fig.height=10, fig.cap="Gene set enrichment analysis of UPF1 variants using Hallmark geneset"}
+gseaResults_h %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + theme_pubclean() + coord_flip() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") +
+  geom_hline(yintercept = 0)
+```
+
+
+- Biological processes 
+
+```{r}
+msigdb_C5 = msigdbr(species = "Homo sapiens",  category = "C5", subcategory = "GO:BP") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene,
+                 id = gs_exact_source) %>% 
+  left_join(goSummaries, by = "id") %>% 
+  dplyr::filter(shortest_path > 4) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+```
+
+```{r}
+gseaResults_c5 = fgseaMultilevel(msigdb_C5,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+```{r}
+gseaResults_c5 %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_c5  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+```{r fig.height=10,fig.wdith=15, fig.cap="Gene set enrichment analysis of UPF1 variants using C5 Biological processes geneset"}
+gseaResults_c5 %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("")
+
+```
+
+- Reactome 
+
+```{r}
+msigdb_C2 = msigdbr(species = "Homo sapiens",  category = "C2", subcategory = "REACTOME") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>% 
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+gseaResults_reactome = fgseaMultilevel(msigdb_C2,fgsea_ranks) %>% 
+ # mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+
+```
+
+
+
+```{r}
+gseaResults_reactome %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_reactome  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+```{r fig.height=10,fig.width=20, fig.cap="Gene set enrichment analysis of UPF1 variants using REACTOME geneset"}
+ gseaResults_reactome  %>%
+  head(20) %>%
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("")
+```
+
+
+## Comparison with previous data 
+
+```{r}
+
+
+
+```
 
 
 
@@ -939,9 +1203,16 @@ dds$Group <- factor(dds$Group, levels = c("Control","UPF1", "FRAX", "FMR1"))
 dds <- DESeqDataSetFromTximport(txi_genes,
                                 colData = md,
                                 design = ~Batch +Group + Sex)
+
+smallestGroupSize <- 3
+keep <- rowSums(counts(dds) >= 20) >= smallestGroupSize
+dds <- dds[keep,]
 dds <- DESeq(dds)
 
-res <- results(dds, contrast=c("Group","UPF1","Control"))
+res <- results(dds, contrast=c("Group","UPF1","Control")) %>%
+  as.data.frame() %>%
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
 
 
 gene_counts = list()
@@ -996,6 +1267,226 @@ gene_counts %>%
   ylab("Number of DEGs") 
 ```
 
+
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using DESeq2"}
+DEColours <- c("Downregulated" = "#38A6A5","Upregulated" = "#CC503E",  "NotSig" = "#E5E5E5")
+
+
+volc = res  %>%
+  mutate(res = ifelse(log2FoldChange> 0 & padj < 0.05, "Upregulated", 
+                      ifelse(log2FoldChange < 0 & padj < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(padj), 
+               x =  log2FoldChange , 
+               colour = res,
+               size =-log10(padj), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = c(-log2(2), log2(2)), size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 12)
+
+
+volc = volc + geom_text_repel(data=subset(res , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5, fill = "white")
+volc
+```
+
+- Performing fgsea with deseq2
+
+```{r}
+fgsea_ranks <- res %>%
+                mutate(rankstat = sign(log2FoldChange)*-log10(pvalue)) %>%
+                arrange(desc(rankstat)) %>%
+  with(
+    structure(rankstat, names = ensembl_gene_id)
+  )
+
+fgsea_ranks=  fgsea_ranks [is.finite(fgsea_ranks)]
+```
+
+
+```{r}
+gseaResults_h = fgseaMultilevel(msigdb_H,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+
+```{r}
+gseaResults_h %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_h %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+
+```
+
+```{r fig.height=10, fig.cap="Gene set enrichment analysis of UPF1 variants using Hallmark geneset"}
+gseaResults_h %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + theme_pubclean() + coord_flip() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") +
+  geom_hline(yintercept = 0)
+```
+
+```{r}
+msigdb_C5 = msigdbr(species = "Homo sapiens",  category = "C5", subcategory = "GO:BP") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene,
+                 id = gs_exact_source) %>% 
+  left_join(goSummaries, by = "id") %>% 
+  dplyr::filter(shortest_path > 4) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+```
+
+```{r}
+gseaResults_c5 = fgseaMultilevel(msigdb_C5,fgsea_ranks) %>% 
+  mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+```{r}
+gseaResults_c5 %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_c5  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+```{r fig.height=10,fig.wdith=15, fig.cap="Gene set enrichment analysis of UPF1 variants using C5 Biological processes geneset"}
+gseaResults_c5 %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("")
+
+```
+
+- Reactome 
+
+```{r}
+msigdb_C2 = msigdbr(species = "Homo sapiens",  category = "C2", subcategory = "REACTOME") %>% 
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>% as.data.frame() %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>% 
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+gseaResults_reactome = fgseaMultilevel(msigdb_C2,fgsea_ranks) %>% 
+ # mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+
+```
+
+
+
+```{r}
+gseaResults_reactome %<>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  ) 
+
+gseaResults_reactome  %>% 
+   DT::datatable(caption=
+      "
+      All Hallmark gene sets considered to be enriched in the ranked 
+      list of genes. 
+      All p-values are Bonferroni-adjusted. A Normalised Enrichment Score 
+      (NES) > 0 indicates that the geneset was enriched amongst 
+      up-regulated genes, whilst a negative NES indicates enrichment in the 
+      down-regulated genes. Genes in the Leading Edge represent those which
+      appear in the ranked list up until the point of the most extreme NES.
+      "
+    )
+```
+
+```{r fig.height=10,fig.width=20, fig.cap="Gene set enrichment analysis of UPF1 variants using REACTOME geneset"}
+ gseaResults_reactome  %>%
+  head(20) %>%
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + coord_flip() + theme_pubclean() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("")
+```
+
+
+## How many DEGs are for fragile 
+## Overlap and correlation of Upf1 and fragile (intersection and both) - between both analyses 
+
+## Overlap limma and deseq2 
 <!-- ```{r} -->
 <!-- dds <- DESeq(dds) -->
 
