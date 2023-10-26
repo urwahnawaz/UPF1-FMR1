@@ -75,6 +75,14 @@ mcols(transGR) = mcols(transGR) %>%
   cbind(
     transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
   )
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
 ```
 
 
