@@ -46,6 +46,21 @@ library(fgsea)
 goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
     readRDS() %>%
     mutate(ontology = as.character(ontology))
+
+getGeneLists <- function(pwf, goterms, genome, ids){
+    gene2cat <- getgo(rownames(pwf), genome, ids)
+    cat2gene <- split(rep(names(gene2cat), sapply(gene2cat, length)),
+                      unlist(gene2cat, use.names = FALSE))
+    out <- list()
+    for(term in goterms){
+        tmp <- pwf[cat2gene[[term]],]
+        tmp <- rownames(tmp[tmp$DEgenes > 0, ])
+        out[[term]] <- tmp
+    }
+    out
+
+
+}
 ```
 
 
@@ -58,10 +73,11 @@ tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
 
 ```{r}
 ah <- AnnotationHub() %>%
-    subset(species == "Mus musculus") %>%
+    subset(species == "Homo sapiens") %>%
     subset(rdataclass == "EnsDb") %>% 
-  subset(genome == "GRCm39")
-ensDb <- ah[["AH104895"]]
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
 grTrans <- transcripts(ensDb)
 trLengths <- exonsBy(ensDb, "tx") %>%
     width() %>%
@@ -342,6 +358,7 @@ id2Name <- structure(
 
 ```{r}
 gseaResults_h_limma = fgseaMultilevel(msigdb_H,fgsea_ranks) %>% 
+  as.data.frame() %>%
   mutate(padj = p.adjust(pval, "bonf")) %>% 
    dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
 ```
@@ -599,6 +616,7 @@ Overlap of limma and deseq2 results
 
 
 ```{r}
+library(VennDiagram)
 all.limma = upf1_results_lfc %>% 
   dplyr::filter(adj.P.Val < 0.05)
 
@@ -642,6 +660,14 @@ ggvenn(x[c(3,4)])
 ```{r}
 ggvenn(x[c(5,6)])
 
+
+overlap = calculate.overlap(x=list( "downregulated (limma)"= dreg.limma$ensembl_gene_id,
+    "downregulated (deseq2)"= dreg.deseq2$ensembl_gene_id))
+```
+
+```{r}
+
+deseq2.down.genes = overlap$a2[!overlap$a2 %in%overlap$a3]
 ```
 
 
@@ -693,6 +719,16 @@ res %>%
   geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") 
 
 ```
+
+
+```{r}
+res_frax  %>% 
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, log2FoldChange, padj) %>% 
+  dplyr::arrange(padj) %>% 
+  DT::datatable(caption="DEGs in FRAX relative to controls using the DESeq2 pipeline") 
+``` 
+
 
 ## Gene set enrichment analysis 
 
@@ -951,4 +987,33 @@ gseaResults_reactome  %>%
       appear in the ranked list up until the point of the most extreme NES.
       "
     )
+```
+
+# Gene ontology of non-overlapping genes
+
+
+In DESeq2, about 481 genes did not overlap with limma. I next wanted to investigate what these genes represent. The downregulated genes represent the majority of genes that are different in the DESeq2 and limma analyses
+
+
+```{r}
+genes = as.integer(res$ensembl_gene_id %in% deseq2.down.genes)
+not_na = !is.na(genes)
+names(genes) = res$ensembl_gene_id
+genes = genes[not_na]
+    
+pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
+Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
+goterms <- Go.wall$category
+goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
+Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
+Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+```
+
+
+```{r}
+Go.wall %>% 
+  dplyr::filter(over_represented_pvalue < 0.05) %>%
+  dplyr::select(term, everything()) %>% 
+  DT::datatable(caption="Downregulated genes from DESeq2")
+
 ```
