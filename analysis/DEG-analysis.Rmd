@@ -1,0 +1,347 @@
+---
+title: "DEG-analysis"
+author: "urwahnawaz"
+date: "2024-01-12"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+
+```{r}
+source(here::here("code/libraries.R"))
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(gridExtra)
+library(EnsDb.Hsapiens.v86)
+library(ggrepel)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+
+goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
+    readRDS() %>%
+    mutate(ontology = as.character(ontology))
+```
+
+
+```{r}
+txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
+```
+
+
+
+```{r}
+ah <- AnnotationHub() %>%
+    subset(species == "Homo sapiens") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)
+
+mcols(transGR) = mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
+```
+
+
+
+```{r}
+salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon")
+salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
+all_files = file.path(salmon, "quant.sf")
+sample_names = gsub("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/", "", salmon)
+sample_names = gsub(".gz_transcripts", "", sample_names)
+sample_names = gsub("\\_.*", "", sample_names)
+names(all_files) <- sample_names
+md = read.csv(here::here("data/Sample_info.csv"), header= TRUE) %>%  
+  #mutate(files = file.path(salmon, "quant.sf")) %>% 
+  dplyr::rename("names" = "GeneWiz.ID", 
+                "Group" = "Sample.type") %>% 
+  mutate(Group = ifelse(Group == "MC" | Group == "FC", "Control", Group)) %>%
+  dplyr::select(names,everything()) %>% 
+  mutate(names = gsub("\\_.*", "", names) )
+md = md[order(match(md$names, sample_names)),]
+md %<>% 
+  rownames_to_column("random") %>% 
+#  column_to_rownames("names") %>%
+  dplyr::select(-random) %>%
+  mutate(files = all_files)
+
+md %<>% dplyr::filter(Group != "FMR1") %>%
+ dplyr::filter(names != "23-LDJ6767") %>%
+dplyr::filter(names != "202")
+all_files = all_files[names(all_files) %in% md$names]
+```
+
+
+```{r}
+txi_genes =  tximport(all_files, type="salmon", txOut=FALSE,
+                      countsFromAbundance="scaledTPM", tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
+keep.genes = (rowSums(txi_genes$abundance >= 1 ) >= 3)
+
+```
+
+
+# Differential gene expression analysis 
+
+```{r}
+txi_genes_filtered = txi_genes$counts[keep.genes,]
+y <- DGEList(txi_genes_filtered)
+
+
+design <- model.matrix(~Batch +Group + Sex, data = md) %>% 
+    set_colnames(gsub(pattern = "Group", replacement ="", x = colnames(.)))
+
+y <- calcNormFactors(y)
+v <- voom(y, design)
+
+fit = lmFit(v, design) %>% 
+    eBayes()
+
+```
+ 
+```{r}
+summary(decideTests(fit, lfc =0))
+```
+
+## UPF1 DEGs
+
+```{r}
+upf1_results_lfc = topTable(fit,coef = "UPF1", number = Inf) %>% 
+                     mutate(res = ifelse(logFC > 0& adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+```
+
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
+
+DEColours <- c("Downregulated" = "#2e294e","Upregulated" = "#720026",  "NotSig" = "#E5E5E5")
+
+
+volc_upf1 = upf1_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 7.5)
+
+
+# volc = volc_upf1+ geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+#                       "SMG5", "SMG6",
+#                       "UPF3A", "ATF4", 
+#                       "GADD5G")),
+#             aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+#              vjust=-0.40, color = "black", box.padding = 0.5, fill = "white") + ggtitle("DEGs in UPF1 relative to controls using limma/voom")
+# 
+# 
+# volc 
+
+my_gg = volc_upf1 + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+```
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  dplyr::arrange(adj.P.Val) %>% 
+  DT::datatable(caption="DEGS in UPF1 relative to controls using limma/voom pipeline") 
+```
+
+
+- Gene ontology 
+
+- All
+```{r}
+
+
+```
+
+- Up
+```{r}
+
+
+```
+
+- Down 
+
+```{r}
+
+
+```
+
+## FRAX DEGs
+```{r}
+frax_results_lfc = topTable(fit,coef = "FRAX", number = Inf) %>% 
+                     mutate(res = ifelse(logFC > 0  & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+```
+
+
+
+```{r}
+DEColours <- c("Downregulated" = "#2e294e","Upregulated" = "#720026",  "NotSig" = "#E5E5E5")
+
+
+volc_frax = frax_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 7.5)
+
+
+# volc = volc + geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+#                       "SMG5", "SMG6",
+#                       "UPF3A", "ATF4", 
+#                       "GADD5G", "FMR1")),
+#             aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+#              vjust=-0.40, color = "black", box.padding = 0.5, fill = "white") + ggtitle("DEGs in FRAX relative to controls using limma/voom pipeline")
+
+
+my_gg =  volc_frax + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+```
+
+
+- Gene ontology 
+
+- All
+```{r}
+
+
+```
+
+- Up
+```{r}
+
+
+```
+
+- Down 
+
+```{r}
+
+
+```
+
+## Overlap of UPF1 and FRAX
+
+* Number of genes overlapping
+```{r}
+
+x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
+        "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05])
+
+ggvenn(x)
+```
+
+```{r fig.cap="Overlap of significant genes from FRAX and UPF1"}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc %>% 
+               dplyr::filter(adj.P.Val < 0.05) %>%
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
+  ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 222 overlapping genes")
+
+```
+
+- Gene ontology
+
+- UPF1 specific genes 
+
+```{r}
+
+
+```
+
+
+- FMR1 specific genes 
+
+```{r}
+
+
+```
+
+
+Gene ontology
+```{r}
+
+```
+
+## Results and output
+
+```{r}
+
+```
