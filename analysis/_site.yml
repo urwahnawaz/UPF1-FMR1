@@ -5,14 +5,12 @@ navbar:
   left:
   - text: Home
     href: index.html
-  - text: About
-    href: about.html
-  - text: License
-    href: license.html
   - text: Exploratory QC
     href: Quality-control.html
   - text: Gene expression
     href: Exploratory-DEG.html
+  - text: DEG analysis
+    href: DEG-analysis.html
   right:
   - icon: fab fa-github
     text: Source code

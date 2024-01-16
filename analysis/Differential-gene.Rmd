@@ -1,0 +1,266 @@
+---
+title: "Differential-gene"
+author: "urwahnawaz"
+date: "2023-11-11"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Analysis of FRAX and UFP1 gene s
+
+
+## Introduction
+
+
+```{r}
+source(here::here("code/libraries.R"))
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(gridExtra)
+library(EnsDb.Hsapiens.v86)
+library(ggrepel)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+
+goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
+    readRDS() %>%
+    mutate(ontology = as.character(ontology))
+
+getGeneLists <- function(pwf, goterms, genome, ids){
+    gene2cat <- getgo(rownames(pwf), genome, ids)
+    cat2gene <- split(rep(names(gene2cat), sapply(gene2cat, length)),
+                      unlist(gene2cat, use.names = FALSE))
+    out <- list()
+    for(term in goterms){
+        tmp <- pwf[cat2gene[[term]],]
+        tmp <- rownames(tmp[tmp$DEgenes > 0, ])
+        out[[term]] <- tmp
+    }
+    out
+
+
+}
+```
+
+
+```{r}
+txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
+```
+
+
+
+```{r}
+ah <- AnnotationHub() %>%
+    subset(species == "Homo sapiens") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)
+
+mcols(transGR) = mcols(transGR) %>%
+  cbind(
+    transcriptLengths(ensDb)[rownames(.), c("nexon", "tx_len")]
+  )
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
+```
+
+
+
+```{r}
+salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon")
+salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
+all_files = file.path(salmon, "quant.sf")
+sample_names = gsub("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/", "", salmon)
+sample_names = gsub(".gz_transcripts", "", sample_names)
+sample_names = gsub("\\_.*", "", sample_names)
+names(all_files) <- sample_names
+md = read.csv(here::here("data/Sample_info.csv"), header= TRUE) %>%  
+  #mutate(files = file.path(salmon, "quant.sf")) %>% 
+  dplyr::rename("names" = "GeneWiz.ID", 
+                "Group" = "Sample.type") %>% 
+  mutate(Group = ifelse(Group == "MC" | Group == "FC", "Control", Group)) %>%
+  dplyr::select(names,everything()) %>% 
+  mutate(names = gsub("\\_.*", "", names) )
+md = md[order(match(md$names, sample_names)),]
+md %<>% 
+  rownames_to_column("random") %>% 
+#  column_to_rownames("names") %>%
+  dplyr::select(-random) %>%
+  mutate(files = all_files)
+
+md %<>% dplyr::filter(Group != "FMR1") %>%
+ dplyr::filter(names != "23-LDJ6767") %>%
+dplyr::filter(names != "202")
+all_files = all_files[names(all_files) %in% md$names]
+```
+
+
+```{r}
+txi_genes =  tximport(all_files, type="salmon", txOut=FALSE,
+                      countsFromAbundance="scaledTPM", tx2gene = tx2gene, ignoreTxVersion = TRUE, ignoreAfterBar = TRUE)
+keep.genes = (rowSums(txi_genes$abundance >= 1 ) >= 3)
+
+```
+
+
+# Limma and voom
+
+```{r}
+txi_genes_filtered = txi_genes$counts[keep.genes,]
+y <- DGEList(txi_genes_filtered)
+
+
+design <- model.matrix(~Batch +Group + Sex, data = md) %>% 
+    set_colnames(gsub(pattern = "Group", replacement ="", x = colnames(.)))
+
+y <- calcNormFactors(y)
+v <- voom(y, design)
+
+fit = lmFit(v, design) %>% 
+    eBayes()
+
+```
+ 
+Using the limma/voom pipeline, the total number of DEGs across groups: 
+
+
+```{r}
+summary(decideTests(fit, lfc =0))
+```
+
+```{r}
+upf1_results_lfc = topTable(fit,coef = "UPF1", number = Inf) %>% 
+                     mutate(res = ifelse(logFC > 0& adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
+  rownames_to_column("ensembl_gene_id") %>%
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+```
+
+## Volcano plots 
+
+
+```{r}
+DEColours <- c("Downregulated" = "#4a5759","Upregulated" = "#edafb8",  "NotSig" = "#E5E5E5")
+
+
+volc = upf1_results_lfc  %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
+    ggplot(aes(y = -log10(adj.P.Val), 
+               x =  logFC , 
+               colour = res,
+               size =-log10(adj.P.Val), 
+               label= SYMBOL)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  xlim(-8.5, 8.5) + ylim(0, 7)
+
+
+volc = volc + geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+                      "SMG5", "SMG6",
+                      "UPF3A", "ATF4", 
+                      "GADD5G")),
+            aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+             vjust=-0.40, color = "black", box.padding = 0.5) + ggtitle("UPF1")
+
+
+volc 
+
+```
+
+
+## Gene set enrichment analysis 
+
+
+```{r}
+fgsea_ranks <- topTable(fit, coef = "UPF1", number = Inf) %>%
+                rownames_to_column("ensemblID") %>%
+                mutate(rankstat = sign(logFC)*-log10(P.Value)) %>%
+                arrange(desc(rankstat)) %>%
+  with(
+    structure(rankstat, names = ensemblID)
+  )
+```
+
+
+```{r}
+msigdb_c5 = msigdbr(species = "Homo sapiens",  category = "C2") %>% 
+  dplyr::filter(gs_subcat == "HPO") %>%
+  dplyr::filter(ensembl_gene %in% rownames(fit)) %>% 
+  distinct(gs_name, ensembl_gene, .keep_all = TRUE) %>%
+   dplyr::rename(ensemblID = ensembl_gene) %>%
+         #dplyr::inner_join(ens2Entrez) %>%
+         dplyr::distinct(gs_name, ensemblID, .keep_all = TRUE) %>%
+         split(f = .$gs_name) %>%
+         lapply(extract2, "ensemblID")
+
+
+id2Name <- structure(
+  genesGR$gene_name,
+  names = genesGR$gene_id
+) %>% 
+  .[!duplicated(names(.))]
+
+```
+
+```{r}
+gseaResults_c5_limma = fgseaMultilevel(msigdb_c5,fgsea_ranks) %>% 
+  as.data.frame() %>%
+  #mutate(padj = p.adjust(pval, "bonf")) %>% 
+   dplyr::select(gs_name = pathway, pval, padj, NES, size, leadingEdge)
+```
+
+```{r}
+gseaResults_c5_limma %>% 
+ # left_join(c2, by="gs_name")
+  
+  dplyr::filter(padj < 0.05) %>% 
+  mutate(
+    leSize = vapply(leadingEdge, length, integer(1)),
+   leadingEdge = vapply(
+     leadingEdge,
+     function(x) paste(id2Name[x], collapse = "; "),
+     character(1)
+   ) 
+  )  %>% 
+  DT::datatable()
+```
+
+```{r}
+ gseaResults_h_limma %>% 
+  ggplot(aes(gs_name,NES)) +
+  geom_linerange(aes(x= gs_name, ymin = 0, ymax = NES),
+                 color = "lightgrey", size =1.5) +
+  geom_point(aes(size=leSize, color = NES)) + theme_pubclean() + coord_flip() +
+  ylab("Normalized Enrichment Score") + scale_color_gradient(low = "#f8997d", 
+                                                            high = "#AD336D") + xlab("") +
+  geom_hline(yintercept = 0) + ggtitle("Hallmark results using limma")
+```
