@@ -2,7 +2,10 @@
 title: "DEG-analysis"
 author: "urwahnawaz"
 date: "2024-01-12"
-output: workflowr::wflow_html
+output: 
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
 editor_options:
   chunk_output_type: console
 ---
@@ -39,6 +42,21 @@ library(fgsea)
 goSummaries <- url("https://uofabioinformaticshub.github.io/summaries2GO/data/goSummaries.RDS") %>%
     readRDS() %>%
     mutate(ontology = as.character(ontology))
+
+getGeneLists <- function(pwf, goterms, genome, ids){
+    gene2cat <- getgo(rownames(pwf), genome, ids)
+    cat2gene <- split(rep(names(gene2cat), sapply(gene2cat, length)),
+                      unlist(gene2cat, use.names = FALSE))
+    out <- list()
+    for(term in goterms){
+        tmp <- pwf[cat2gene[[term]],]
+        tmp <- rownames(tmp[tmp$DEgenes > 0, ])
+        out[[term]] <- tmp
+    }
+    out
+
+
+}
 ```
 
 
@@ -147,7 +165,9 @@ upf1_results_lfc = topTable(fit,coef = "UPF1", number = Inf) %>%
                      mutate(res = ifelse(logFC > 0& adj.P.Val < 0.05, "Upregulated", 
                       ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
   rownames_to_column("ensembl_gene_id") %>%
-   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first")) %>%
+  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig")))
 ```
 
 ```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
@@ -156,8 +176,6 @@ DEColours <- c("Downregulated" = "#2e294e","Upregulated" = "#720026",  "NotSig" 
 
 
 volc_upf1 = upf1_results_lfc  %>%
-  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
-                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
     ggplot(aes(y = -log10(adj.P.Val), 
                x =  logFC , 
                colour = res,
@@ -198,26 +216,24 @@ upf1_results_lfc %>%
 ```
 
 
-- Gene ontology 
+<!-- # ```{r} -->
+<!-- # sig_genes = upf1_results_lfc %>%  -->
+<!-- #   dplyr::filter(adj.P.Val < 0.05) %>%  -->
+<!-- #   dplyr::select(ensembl_gene_id)  -->
+<!-- #  -->
+<!-- # not_na = !is.na(genes) -->
+<!-- # names(genes) = upf1_results_lfc$ensembl_gene_id -->
+<!-- # genes = genes[not_na] -->
+<!-- #      -->
+<!-- # pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene') -->
+<!-- # Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE) -->
+<!-- # goterms <- Go.wall$category -->
+<!-- # goList <- getGeneLists(pwf, goterms, 'hg19','ensGene') -->
+<!-- # Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]]) -->
+<!-- # Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L)) -->
+<!-- # ``` -->
 
-- All
-```{r}
 
-
-```
-
-- Up
-```{r}
-
-
-```
-
-- Down 
-
-```{r}
-
-
-```
 
 ## FRAX DEGs
 ```{r}
@@ -225,7 +241,9 @@ frax_results_lfc = topTable(fit,coef = "FRAX", number = Inf) %>%
                      mutate(res = ifelse(logFC > 0  & adj.P.Val < 0.05, "Upregulated", 
                       ifelse(logFC < 0 & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>% 
   rownames_to_column("ensembl_gene_id") %>%
-   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"))
+   mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first")) %>% 
+    mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
+                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) 
 ```
 
 
@@ -235,8 +253,6 @@ DEColours <- c("Downregulated" = "#2e294e","Upregulated" = "#720026",  "NotSig" 
 
 
 volc_frax = frax_results_lfc  %>%
-  mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
-                      ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) %>%
     ggplot(aes(y = -log10(adj.P.Val), 
                x =  logFC , 
                colour = res,
@@ -267,36 +283,24 @@ girafe(ggobj = my_gg)
 ```
 
 
-- Gene ontology 
-
-- All
-```{r}
 
 
-```
-
-- Up
-```{r}
-
-
-```
-
-- Down 
-
-```{r}
-
-
-```
 
 ## Overlap of UPF1 and FRAX
 
 * Number of genes overlapping
 ```{r}
-
+library(VennDiagram)
 x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
         "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05])
 
 ggvenn(x)
+```
+
+```{r}
+overlaps = calculate.overlap(x)
+upf1_only = overlaps$a1[!overlaps$a1 %in% overlaps$a3]
+fmr1_only = overlaps$a2[!overlaps$a2 %in% overlaps$a3]
 ```
 
 ```{r fig.cap="Overlap of significant genes from FRAX and UPF1"}
@@ -319,10 +323,103 @@ upf1_results_lfc %>%
 
 - Gene ontology
 
+```{r}
+genes = as.integer(upf1_results_lfc$ensembl_gene_id %in% overlaps$a3)
+not_na = !is.na(genes)
+names(genes) = upf1_results_lfc$ensembl_gene_id
+genes = genes[not_na]
+    
+pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
+Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
+goterms <- Go.wall$category
+goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
+Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
+Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+```
+
+```{r}
+goRes = Go.wall %>%
+            dplyr::select(-under_represented_pvalue) %>%
+            dplyr::filter(numDEInCat > 0) %>%
+            dplyr::rename(id = category) %>%
+            left_join(goSummaries)
+nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
+goFinal <- goRes %>%
+  dplyr::filter(numDEInCat > 2) %>% 
+  dplyr::filter(shortest_path > 3) %>%
+  arrange(desc(shortest_path), EnsemblID) %>% 
+  distinct(EnsemblID, .keep_all = TRUE) %>%
+  arrange(over_represented_pvalue) %>% 
+  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
+            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
+                   FDR = p.adjust(over_represented_pvalue, "fdr"),
+                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
+            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
+  dplyr::select(term, everything()) 
+  
+  
+goFinal %>% 
+  DT::datatable(caption="222 overlapping genes")
+
+```
+
+
 - UPF1 specific genes 
 
 ```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(ensembl_gene_id %in% upf1_only) %>% 
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc %>% 
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>%
+  ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 441 UPF1 specific genes")
 
+```
+
+```{r}
+genes = as.integer(upf1_results_lfc$ensembl_gene_id %in% upf1_only)
+not_na = !is.na(genes)
+names(genes) = upf1_results_lfc$ensembl_gene_id
+genes = genes[not_na]
+    
+pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
+Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
+goterms <- Go.wall$category
+goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
+Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
+Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+```
+
+```{r}
+goRes = Go.wall %>%
+            dplyr::select(-under_represented_pvalue) %>%
+            dplyr::filter(numDEInCat > 0) %>%
+            dplyr::rename(id = category) %>%
+            left_join(goSummaries)
+nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
+goFinal <- goRes %>%
+  dplyr::filter(numDEInCat > 2) %>% 
+  dplyr::filter(shortest_path > 4) %>%
+  arrange(desc(shortest_path), EnsemblID) %>% 
+  distinct(EnsemblID, .keep_all = TRUE) %>%
+  arrange(over_represented_pvalue) %>% 
+  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
+            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
+                   FDR = p.adjust(over_represented_pvalue, "fdr"),
+                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
+            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
+  dplyr::select(term, everything()) 
+  
+  
+goFinal %>% 
+  DT::datatable(caption="UPF1 specific genes")
 
 ```
 
@@ -330,18 +427,220 @@ upf1_results_lfc %>%
 - FMR1 specific genes 
 
 ```{r}
-
+frax_results_lfc %>% 
+  dplyr::filter(ensembl_gene_id %in% fmr1_only) %>% 
+  dplyr::select(SYMBOL,ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val) %>% 
+  inner_join(upf1_results_lfc %>% 
+                dplyr::select(ensembl_gene_id, logFC, 
+                            adj.P.Val), by = "ensembl_gene_id") %>%
+  ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("FRAX (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 1178 FRAX specific genes")
 
 ```
 
 
 Gene ontology
+
+
 ```{r}
+genes = as.integer(frax_results_lfc$ensembl_gene_id %in% fmr1_only)
+not_na = !is.na(genes)
+names(genes) = frax_results_lfc$ensembl_gene_id
+genes = genes[not_na]
+    
+pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
+Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
+goterms <- Go.wall$category
+goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
+Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
+Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+```
+
+```{r}
+goRes = Go.wall %>%
+            dplyr::select(-under_represented_pvalue) %>%
+            dplyr::filter(numDEInCat > 0) %>%
+            dplyr::rename(id = category) %>%
+            left_join(goSummaries)
+nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
+goFinal <- goRes %>%
+  dplyr::filter(numDEInCat > 2) %>% 
+  dplyr::filter(shortest_path > 4) %>%
+  arrange(desc(shortest_path), EnsemblID) %>% 
+  distinct(EnsemblID, .keep_all = TRUE) %>%
+  arrange(over_represented_pvalue) %>% 
+  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
+            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
+                   FDR = p.adjust(over_represented_pvalue, "fdr"),
+                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
+            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
+  dplyr::select(term, everything()) 
+  
+  
+goFinal %>% 
+  DT::datatable(caption="FRAX specific genes")
 
 ```
 
-## Results and output
+
+# Comparison of DEGs with DSB genes from Chakraborty et al
 
 ```{r}
+dsbs = read_xlsx(here::here("data/lists/DSBs/FX_DSB_genes.xlsx"), skip = 1)
+exp_cl = read_xlsx(here::here("data/lists/DSBs/msrd_results_LCL_Silent_Genes.xlsx"), sheet = 1)
+
+dsbs_lcls = dsbs[!dsbs$ensembl_gene_id %in% exp_cl$ensembl_id,]
+```
+
+* Jozef's questions 
+* Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and the DEGs in FRAXA/FMR1 LCLs even if across 2x different studies? If not overlap based on p value, is there a trend for these DSB-associated genes to be downregulated?
+*Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and DEGs in UPF3B patient LCLs, the reason being that UPF3B patients have no or very little FMRP left as Saba determined? Also, if no overlap strictly on p value, is there a trend of the DSB genes to be down-regulated in UPF3B LCLs?
+* The same as above, but comparing the DSB genes to UPF1 DEGs, etc.
+
+
+- From this study - using the FRAX DEGs and UPF1 DEGs 
+
+```{r}
+x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
+        "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05], 
+        "Double stranded breaks" = dsbs$ensembl_gene_id)
+
+ggvenn(x)
 
 ```
+
+
+```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
+frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>% 
+  rbind(upf1_results_lfc %>% 
+          dplyr::filter(adj.P.Val < 0.05) %>%
+          mutate(condition="UPF1") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id")) %>%
+  ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
+  theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+                                           "Downregulated"= "#2e294e")) + 
+  ggtitle("Number of DEGs with DSBs")
+```
+
+```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
+library(ggstatsplot)
+frax_results_lfc %>% 
+  mutate(res = ifelse(logFC > 0, "Upregulated", 
+                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>% 
+  rbind(upf1_results_lfc %>% 
+         mutate(res = ifelse(logFC > 0, "Upregulated", 
+                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
+          mutate(condition="UPF1") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id")) %>%
+  ggbarstats(
+  x                = res,
+  y                = condition,
+
+xlab = "",
+legend.title     = "",
+  ggplot.component = list(ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2))),
+) + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+                                           "Downregulated"= "#2e294e"))
+
+
+  
+ # ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
+  #theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+             #                              "Downregulated"= "#2e294e")) + 
+  #ggtitle("Number of DEGs with DSBs")
+```
+
+```{r}
+library(GeneOverlap)
+enrichment_gene_list_pvalue = list()
+enrichment_gene_list_OR = list()
+
+test.list = list()
+test.list$BG = frax_results_lfc$ensembl_gene_id
+test.list$frax_sig = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05]
+test.list$frax_sig_up = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC > 0]
+test.list$frax_sig_down = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC < 0]
+test.list$upf1_sig = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05]
+test.list$upf1_sig_up = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC > 0]
+test.list$upf1_sig_down = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC < 0]
+test.list$dsbs = dsbs$ensembl_gene_id
+## Maybe an exact test with odds ratio 
+
+for (list in c("frax_sig","frax_sig_up","frax_sig_down","upf1_sig",
+               "upf1_sig_up", "upf1_sig_down")) {
+    go.obj <- newGeneOverlap(test.list[[list]],
+                         test.list$dsbs,
+                         genome.size=length(test.list$BG))
+    go.obj <- testGeneOverlap(go.obj)
+    enrichment_gene_list_pvalue[[paste0(list)]] = go.obj@pval
+    enrichment_gene_list_OR[[paste0(list)]] = go.obj@odds.ratio
+    
+  }
+
+
+enrichment_GL_pval = do.call(rbind, enrichment_gene_list_pvalue) %>% as.data.frame()
+colnames(enrichment_GL_pval)[1] = c("pvalue")
+enrichment_GL_pval$padj = p.adjust(enrichment_GL_pval$pvalue, method = "BH")
+enrichment_GL_OR  = do.call(rbind, enrichment_gene_list_OR) %>% as.data.frame()
+colnames(enrichment_GL_OR)[1] = c("OR")
+GL_enrichment = cbind(enrichment_GL_pval, enrichment_GL_OR)
+```
+
+```{r}
+GL_enrichment %>% 
+  rownames_to_column("DEGs") %>%
+  ggplot(aes(x=OR, y = DEGs)) + geom_bar(stat = "identity", fill = "#edafb8") +
+  theme_bw() + geom_vline(xintercept = 1) + 
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=12, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(x="Odds ratio") + ggtitle("Enrichment of DSBs in UPF1 or FRAX")
+
+```
+
+
+### List of genes with DSBs
+
+```{r}
+frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>%
+  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
+  DT::datatable(caption = "Genes in FRAX DEGs with DSBs")
+```
+
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>%
+  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
+  DT::datatable(caption = "Genes in UPF1 DEGs with DSBs")
+```
+
+
