@@ -6,9 +6,11 @@ navbar:
   - text: Home
     href: index.html
   - text: Exploratory QC
-    href: Quality-control.html
-  - text: Gene expression
-    href: Exploratory-DEG.html
+    menu:
+    - text: QC analysis
+      href: Quality-control.html
+    - text: Gene expression
+      href: Exploratory-DEG.html
   - text: DEG analysis
     href: DEG-analysis.html
   right:
