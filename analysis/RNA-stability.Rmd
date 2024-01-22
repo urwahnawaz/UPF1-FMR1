@@ -1,0 +1,35 @@
+---
+title: "RNA-stability"
+author: "urwahnawaz"
+date: "2024-01-22"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = FALSE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+```{r libraries}
+
+library(eisaR)
+source("code/libraries.R")
+source("/home/neuro/Documents/NMD_analysis/other_repos/DiffRAC/DiffRAC.R")
+source("code/codes.R")
+library(coin)
+library(gplots)
+library(stargazer)
+```
+
+
+```{r}
+txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
+```
