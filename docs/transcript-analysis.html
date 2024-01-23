@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="urwahnawaz" />
+
+<meta name="date" content="2024-01-23" />
+
+<title>transcript-analysis</title>
+
+<script src="site_libs/header-attrs-2.25/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.4.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">UPF1-FMR1</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Exploratory QC
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="Quality-control.html">QC analysis</a>
+    </li>
+    <li>
+      <a href="Exploratory-DEG.html">Gene expression</a>
+    </li>
+  </ul>
+</li>
+<li>
+  <a href="DEG-analysis.html">DEG analysis</a>
+</li>
+<li>
+  <a href="RNA-stability.html">RNA stability</a>
+</li>
+<li>
+  <a href="transcript-analysis.html">Transcript analysis</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/urwahnawaz/UPF1-FMR1">
+    <span class="fab fa-github"></span>
+     
+    Source code
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">transcript-analysis</h1>
+<h4 class="author">urwahnawaz</h4>
+<h4 class="date">2024-01-23</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2024-01-24
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>UPF1-FMR1/</code> <span
+class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.1). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20230923code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20230923)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20230923code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20230923)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree85d9b5a857f7d7e2d5359abf244341b4105bb94btargetblank85d9b5aa">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/85d9b5a857f7d7e2d5359abf244341b4105bb94b" target="_blank">85d9b5a</a>
+</a>
+</p>
+</div>
+<div
+id="strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree85d9b5a857f7d7e2d5359abf244341b4105bb94btargetblank85d9b5aa"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/85d9b5a857f7d7e2d5359abf244341b4105bb94b" target="_blank">85d9b5a</a>.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/Exploratory-DEG.nb.html
+    Ignored:    analysis/Quality-control.nb.html
+
+Untracked files:
+    Untracked:  data/data-stability-no-FMR1.csv
+    Untracked:  data/data-stability.csv
+    Untracked:  output/DEG-results.Rda
+
+Unstaged changes:
+    Modified:   analysis/DEG-analysis.Rmd
+    Modified:   analysis/_site.yml
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown (<code>analysis/transcript-analysis.Rmd</code>)
+and HTML (<code>docs/transcript-analysis.html</code>) files. If you’ve
+configured a remote Git repository (see <code>?wflow_git_remote</code>),
+click on the hyperlinks in the table below to view the files as they
+were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/blob/85d9b5a857f7d7e2d5359abf244341b4105bb94b/analysis/transcript-analysis.Rmd" target="_blank">85d9b5a</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-01-24
+</td>
+<td>
+wflow_publish(c("analysis/transcript-analysis.Rmd",
+"analysis/index.Rmd"))
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<pre class="r"><code>source(&quot;code/libraries.R&quot;)
+library(coin)
+library(gplots)
+library(stargazer)
+library(janitor)
+library(ggside)
+library(ggstatsplot)
+library(EnsDb.Hsapiens.v86)
+library(fishpond)
+library(tximeta)
+library(GeneOverlap)
+library(ggside)
+library(tidyquant)
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(bigPint)
+library(ggrepel)</code></pre>
+<pre class="r"><code>txdf = transcripts(EnsDb.Hsapiens.v86, return.type=&quot;DataFrame&quot;)
+tx2gene = as.data.frame(txdf[,c(&quot;tx_id&quot;,&quot;gene_id&quot;, &quot;tx_biotype&quot;)])
+
+ah &lt;- AnnotationHub() %&gt;%
+    subset(species == &quot;Homo sapiens&quot;) %&gt;%
+    subset(rdataclass == &quot;EnsDb&quot;) %&gt;% 
+  subset(genome == &quot;GRCh38&quot;)
+
+ensDb &lt;- ah[[&quot;AH109606&quot;]]
+grTrans &lt;- transcripts(ensDb)
+trLengths &lt;- exonsBy(ensDb, &quot;tx&quot;) %&gt;%
+    width() %&gt;%
+    vapply(sum, integer(1))
+mcols(grTrans)$length &lt;- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)</code></pre>
+<pre class="r"><code>NMD_features = read.table(&quot;/home/neuro/Documents/NMD_analysis/Analysis/databases/nif_finder/Output/Homo_sapiens.GRCh38.105/Homo_sapiens.GRCh38.105__nifs.tsv&quot;, sep = &quot;\t&quot;, skip =1)
+
+colnames(NMD_features) = c(&quot;tx_id&quot;, &quot;NIF_dEJ&quot;, &quot;NIF_uORF&quot;,  &quot;NIF_long_3utr&quot;, &quot;NIF|__|GC(cds[-10:termination_codon])&quot;,   &quot;GC_5utr&quot;,  &quot;GC_cds&quot;,   &quot;GC_3utr&quot;,  &quot;GC_exons&quot;, &quot;GC_introns&quot;,   &quot;LENGTH_5utr&quot;,  &quot;LENGTH_cds&quot;,   &quot;LENGTH_3utr&quot;,  &quot;LENGTH_exons&quot;, &quot;LENGTH_introns&quot;, &quot;EXONS_count&quot;,    &quot;dEJs|__|penultimate-exon&gt;=55(nts)&quot;,    &quot;uORFs|__|count&quot;,   &quot;uORFs|__|gc-content&quot;,  &quot;uORFs|__|lengths&quot;, &quot;uORFs|__|max-length&quot;)
+
+NMD_features$NIF_dEJ = ifelse(NMD_features$NIF_dEJ == &quot;True&quot;,gsub(&quot;True&quot;, 1, NMD_features$NIF_dEJ), 0)
+NMD_features$NIF_uORF = ifelse(NMD_features$NIF_uORF == &quot;True&quot;,gsub(&quot;True&quot;, 1, NMD_features$NIF_uORF), 0)
+NMD_features$NIF_long_3utr = ifelse(NMD_features$NIF_long_3utr == &quot;True&quot;,gsub(&quot;True&quot;, 1, NMD_features$NIF_long_3utr), 0)
+NMD_features %&lt;&gt;% mutate_at(.vars = &quot;tx_id&quot;, .funs = gsub, pattern = &quot;\\.[0-9]*$&quot;, replacement = &quot;&quot;)
+
+NMD_features$NIF_dEJ[is.na(NMD_features$NIF_dEJ)] &lt;- 0
+NMD_features$NIF_uORF[is.na(NMD_features$NIF_uORF)] &lt;- 0
+NMD_features$NIF_long_3utr[is.na(NMD_features$NIF_long_3utr)] &lt;- 0</code></pre>
+<pre class="r"><code>nif_ma_plot = function(data){
+  DEColours &lt;- c(&quot;NIF-&quot; = &quot;#14213d&quot;,&quot;NIF+&quot; = &quot;#ff6700&quot;,  &quot;Not Sig&quot; = &quot;#e6e8e6&quot;)
+  temp = data %&gt;% 
+    mutate(nif_label = ifelse(nif_feature != &quot;None&quot; &amp; FDR &lt; 0.05, &quot;NIF+&quot;,        
+               ifelse(nif_feature == &quot;None&quot; &amp; FDR &lt; 0.05, &quot;NIF-&quot;, &quot;Not Sig&quot;)))
+  plot = temp %&gt;% 
+    ggplot(aes(y= logFC,
+               x = logCPM,
+               colour = as.factor(as.character(nif_label)),
+               size= nif_label)) +
+    geom_point(alpha = 0.5) +
+    scale_colour_manual(values = DEColours) + theme_bw()+
+    theme(legend.position = &quot;top&quot;,
+          axis.title.y = element_text(size = 12)) + geom_hline(yintercept = 0, 
+                                                               linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+    geom_ysidedensity(aes(x=after_stat(density),  
+                             color = nif_label, fill = nif_label),  alpha=0.2, size = 1) +
+    scale_fill_manual(values = DEColours) + scale_size_manual(values = c(&quot;NIF+&quot; = 3, 
+                                                                         &quot;NIF-&quot; =2,
+                                                                         &quot;Not Sig&quot;= 2)) +
+    theme(ggside.panel.scale.y = 0.2,
+        axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;, angle = 90),
+        axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;), 
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+         strip.text.x = element_text(
+        size = 12, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        )) + labs(color = &quot;Presence of NMD inducible feature&quot;, 
+                  fill = &quot;&quot;,
+                  size = &quot;&quot;) + scale_alpha(guide = &#39;none&#39;)
+  return(plot)
+    
+}</code></pre>
+<pre class="r"><code>salmon.files = (&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon&quot;)
+salmon = list.files(salmon.files, pattern = &quot;transcripts$&quot;, full.names = TRUE)
+
+salmon = list.files(salmon.files, pattern = &quot;transcripts$&quot;, full.names = TRUE)
+all_files = file.path(salmon, &quot;quant.sf&quot;)
+sample_names = gsub(&quot;/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/&quot;, &quot;&quot;, salmon)
+sample_names = gsub(&quot;.gz_transcripts&quot;, &quot;&quot;, sample_names)
+sample_names = gsub(&quot;\\_.*&quot;, &quot;&quot;, sample_names)
+names(all_files) &lt;- sample_names
+names(salmon) &lt;- sample_names
+md = read.csv(here::here(&quot;data/Sample_info.csv&quot;), header= TRUE) %&gt;%  
+  #mutate(files = file.path(salmon, &quot;quant.sf&quot;)) %&gt;% 
+  dplyr::rename(&quot;names&quot; = &quot;GeneWiz.ID&quot;, 
+                &quot;Group&quot; = &quot;Sample.type&quot;) %&gt;% 
+  mutate(Group = ifelse(Group == &quot;MC&quot; | Group == &quot;FC&quot;, &quot;Control&quot;, Group)) %&gt;%
+  dplyr::select(names,everything()) %&gt;% 
+  mutate(names = gsub(&quot;\\_.*&quot;, &quot;&quot;, names) )
+md = md[order(match(md$names, sample_names)),]
+md %&lt;&gt;% 
+  rownames_to_column(&quot;random&quot;) %&gt;% 
+#  column_to_rownames(&quot;names&quot;) %&gt;%
+  dplyr::select(-random) %&gt;%
+  mutate(files = all_files)
+
+md %&lt;&gt;% dplyr::filter(Group != &quot;FMR1&quot;) %&gt;%
+ dplyr::filter(names != &quot;23-LDJ6767&quot;) %&gt;%
+dplyr::filter(names != &quot;202&quot;)
+all_files = all_files[names(all_files) %in% md$names]
+
+salmon = salmon[names(salmon) %in% md$names]</code></pre>
+<pre class="r"><code>catch &lt;- catchSalmon(salmon)</code></pre>
+<pre><code>Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/1-XX61045-LEJ5123_L2.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/183_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/184_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/185_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/186_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/187_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/189_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/190_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/191_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/192_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/193_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/194_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/195_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/196_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/197_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/198_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/199_L3.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/2-FD61046-LEJ5124_L2.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/200_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/201_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/206_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/207_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/208_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/209_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/210_L4.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/4-MC21-60895-LEJ5126_L2.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/5-MC30-60904-LEJ5127_L2.gz_transcripts, 187432 transcripts, 50 bootstrap samples
+Reading /home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/6-MC37-60927-LEJ5128_L2.gz_transcripts, 187432 transcripts, 50 bootstrap samples</code></pre>
+<pre class="r"><code>colnames(catch$counts) =  md$names
+
+cts.scaled = catch$counts/catch$annotation$Overdispersion
+
+dge &lt;- DGEList(counts = cts.scaled, 
+               genes=catch$annotation, 
+               samples = md,
+               group = md$Group)
+
+keep &lt;- filterByExpr(dge)
+dge.scaled.filtr &lt;- dge[keep, , keep.lib.sizes = FALSE]
+dge.scaled.filtr &lt;- calcNormFactors(dge.scaled.filtr)
+
+dim(dge.scaled.filtr$counts)</code></pre>
+<pre><code>[1] 67420    28</code></pre>
+<pre class="r"><code>cpm(dge.scaled.filtr, log = TRUE) %&gt;% 
+  t() %&gt;% 
+    prcomp(scale = TRUE) %&gt;% 
+  tidy() %&gt;% 
+  dplyr::rename(names = row) %&gt;% 
+  left_join(dge.scaled.filtr$samples, by = &quot;names&quot;) %&gt;%
+   dplyr::filter(PC %in% 1:3) %&gt;% 
+  pivot_wider(names_from = &quot;PC&quot;, names_prefix = &quot;PC&quot;, values_from = &quot;value&quot;) %&gt;% 
+  ggplot(aes(PC1, PC2, colour = Group, size = lib.size/1e6, shape = Sex)) +
+  geom_point() + geom_text_repel(aes(label = names), show.legend = FALSE)</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code> plotMDS(dge.scaled.filtr,col=as.numeric(dge.scaled.filtr$samples$group))</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-7-1.png" width="480" style="display: block; margin: auto;" /></p>
+</div>
+<div id="det-analysis" class="section level1">
+<h1>DET analysis</h1>
+<pre class="r"><code>design &lt;-  model.matrix(~Batch +Group + Sex, data = md) %&gt;% 
+    set_colnames(gsub(pattern = &quot;Group&quot;, replacement =&quot;&quot;, x = colnames(.)))
+
+dge.scaled.filtr &lt;- estimateDisp(dge.scaled.filtr,design)
+
+dge.scaled.filtr$common.dispersion</code></pre>
+<pre><code>[1] 0.2908587</code></pre>
+<pre class="r"><code>plotBCV(dge.scaled.filtr)</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-8-1.png" alt="*Biological coeficcient of variation plot against the average abundance of each transcript. The plot shows the square-root estimates of the common, trended and tagwise NB dispersions.*" width="576" />
+<p class="caption">
+<em>Biological coeficcient of variation plot against the average
+abundance of each transcript. The plot shows the square-root estimates
+of the common, trended and tagwise NB dispersions.</em>
+</p>
+</div>
+<pre class="r"><code>fit &lt;- glmQLFit(dge.scaled.filtr,design)
+plotQLDisp(fit)</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-9-1.png" alt="*Quasi-likelihood dispersion aganist gene abundance. Estimates are shown for raw, tended and squeezed dispersions*" width="576" />
+<p class="caption">
+<em>Quasi-likelihood dispersion aganist gene abundance. Estimates are
+shown for raw, tended and squeezed dispersions</em>
+</p>
+</div>
+<pre class="r"><code>summary(fit$df.prior)</code></pre>
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  4.592   4.592   4.592   4.592   4.592   4.592 </code></pre>
+<pre class="r"><code>res_dte = list()
+
+temp = glmQLFTest(fit, coef=4)
+res_dte$UPF1 = topTags(temp,n = Inf) %&gt;% 
+  as.data.frame() %&gt;% rownames_to_column(&quot;tx_id&quot;) %&gt;%
+    left_join(decideTestsDGE(temp) %&gt;%
+                  as.data.frame() %&gt;%
+                  set_colnames(c(&quot;Results&quot;)) %&gt;%
+                  rownames_to_column(&quot;tx_id&quot;))
+
+temp = glmQLFTest(fit, coef=3)
+res_dte$FRAX = topTags(temp,n = Inf) %&gt;% 
+  as.data.frame() %&gt;% rownames_to_column(&quot;tx_id&quot;) %&gt;%
+    left_join(decideTestsDGE(temp) %&gt;%
+                  as.data.frame() %&gt;%
+                  set_colnames(c(&quot;Results&quot;)) %&gt;%
+                  rownames_to_column(&quot;tx_id&quot;))</code></pre>
+<pre class="r"><code>total = data.frame()
+for (i in names(res_dte)){
+    name = i
+    #comparison = rep(name, 4) %&gt;% as.data.frame()
+    temp = res_dte[[i]]
+    
+    message(&quot;Merging DE results with NMD table for&quot;, paste(name))
+    temp %&lt;&gt;%  as.data.frame() %&gt;%
+      mutate(tx_version = tx_id) %&gt;%
+      mutate_at(.vars = &quot;tx_id&quot;, .funs = gsub, pattern = &quot;\\.[0-9]*$&quot;, replacement = &quot;&quot;) %&gt;% 
+      left_join(NMD_features, by = &quot;tx_id&quot;)
+    
+    message(&quot;Summing all NMD values to determine number of NIFs per transcript for&quot;, paste0(name))
+    temp$nif_feature = ifelse(rowSums(sapply(temp[, c(12:14)],
+                       function(x) as.numeric(as.character(x)))) == 2 ,&quot;Two&quot;,
+                       ifelse(rowSums(sapply(temp[, c(12:14)],
+                              function(x) as.numeric(as.character(x)))) == 3, &quot;Three&quot;, 
+                              ifelse(rowSums(sapply(temp[, c(12:14)],
+                                                    function(x) as.numeric(as.character(x)))) == 1, &quot;One&quot;, &quot;None&quot;)))
+    
+    temp$nif_feature %&lt;&gt;%  replace_na(&quot;None&quot;)
+    res_dte[[paste(name)]] = temp
+    
+    ## downregulation 
+    message(&quot;Subsetting downregulated genes for &quot;, paste0(name))
+    down = temp %&gt;%  as.data.frame() %&gt;%  
+        dplyr::filter(FDR &lt; 0.05 &amp; logFC &lt; 0) 
+    down = table(down$nif_feature)
+    print(nrow(down))
+    repetition = down %&gt;% nrow() %&gt;% as.integer()
+    expression = rep(c(&quot;down&quot;), repetition) %&gt;% as.data.frame()
+    comparison = rep(name, nrow(expression)) %&gt;% as.data.frame()
+    down = cbind(down, expression = expression)
+    down = cbind(down, comparison = comparison)
+    colnames(down) = c(&quot;NIF&quot;, &quot;Value&quot;, &quot;Expression&quot;, &quot;Condition&quot;)
+    
+    ## upregulation 
+    message(&quot;Subsetting upregulated genes for &quot;, paste0(name))
+    up = temp %&gt;%  as.data.frame() %&gt;%  
+        dplyr::filter(FDR &lt; 0.05 &amp; logFC &gt; 0 ) 
+    up = table(up$nif_feature)
+    print(dim(up))
+    repetition = up %&gt;% nrow() %&gt;% as.integer()
+    expression = rep(c(&quot;up&quot;), repetition) %&gt;% as.data.frame()
+    comparison = rep(name, nrow(expression)) %&gt;% as.data.frame()
+    up = cbind(up, expression = expression)
+    up = cbind(up, comparison = comparison)
+    colnames(up) = c(&quot;NIF&quot;, &quot;Value&quot;, &quot;Expression&quot;, &quot;Condition&quot;)
+    
+    ## bind everything together 
+    message(&quot;Binding everything together&quot;)
+    #together = rbind(up, down)
+   
+    #total = rbind(total,as.data.frame(up,down))
+    total = rbind(total,up,down, stringsAsFactors = FALSE)
+}</code></pre>
+<pre><code>[1] 3
+[1] 4
+[1] 4
+[1] 4</code></pre>
+<div id="distribution-of-results" class="section level3">
+<h3>Distribution of results</h3>
+<pre class="r"><code>plot_hist = function(df, comparison, legend = FALSE){
+  ggplot(data= df, aes(x=PValue)) + geom_histogram(fill = &quot;grey&quot;, color=&quot;black&quot;) + theme_bw() + xlab(&quot;Pvalue&quot;) + ylab(&quot;Frequency&quot;)
+}
+plot_fc = function(df){
+  df %&gt;% 
+    dplyr::filter(FDR &lt; 0.05) %&gt;%  
+    ggplot(aes(x=logFC)) + 
+    geom_histogram(aes(y=..density..), colour=&quot;black&quot;, fill=&quot;white&quot;) +  
+    geom_density(alpha=.2, fill=&quot;#FF6666&quot;) + geom_vline(xintercept =c(log2(1.5), -log2(1.5)),color=&quot;red&quot;, linetype = &quot;dashed&quot;)
+}</code></pre>
+<pre class="r"><code>plot_fc(res_dte$UPF1) </code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-14-1.png" alt="Log fold change distribution of UPF1" width="672" />
+<p class="caption">
+Log fold change distribution of UPF1
+</p>
+</div>
+<pre class="r"><code>plot_fc(res_dte$FRAX)</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-15-1.png" alt="Log fold change distribution of FRAX" width="672" />
+<p class="caption">
+Log fold change distribution of FRAX
+</p>
+</div>
+<pre class="r"><code>a = plot_hist(res_dte$UPF3B_KD_Control) + ggtitle(&quot;(a) UPF3B KD vs Control&quot;)
+b = plot_hist(res_dte$UPF3A_KD_Control) + ggtitle(&quot;(b) UPF3A KD vs Control&quot;)</code></pre>
+<ul>
+<li>UPF1</li>
+</ul>
+<pre class="r"><code>ma_1 = nif_ma_plot(res_dte$UPF1) + ggtitle(&quot;UPF1DETs&quot;) +
+  annotate(&quot;label&quot;, x =10, y = 4, label = &quot;Upregulated= 287&quot;) +
+  annotate(&quot;label&quot;, x =10, y = -4, label = &quot;Downregulated =265&quot;)
+
+ma_1</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-17-1.png" alt="Differentially expressed transcripts with NIFs for UPF1" width="672" />
+<p class="caption">
+Differentially expressed transcripts with NIFs for UPF1
+</p>
+</div>
+<p>-FRAX</p>
+<pre class="r"><code>ma_1 = nif_ma_plot(res_dte$FRAX) + ggtitle(&quot;FRAX DETs&quot;) +
+  annotate(&quot;label&quot;, x =10, y = 4, label = &quot;Upregulated= 3694&quot;) +
+  annotate(&quot;label&quot;, x =10, y = -4, label = &quot;Downregulated =947&quot;)
+
+ma_1</code></pre>
+<div class="figure" style="text-align: center">
+<img src="figure/transcript-analysis.Rmd/unnamed-chunk-18-1.png" alt="Differentially expressed transcripts with NIFs for FRAX" width="672" />
+<p class="caption">
+Differentially expressed transcripts with NIFs for FRAX
+</p>
+</div>
+<ul>
+<li>NIF features in the analysis</li>
+</ul>
+<pre class="r"><code>nif_features = list()
+for (i in names(res_dte)){
+  name = i
+  temp = res_dte[[i]]
+  
+  message(&quot;Counting NIFs in upregulated transcripts for &quot;, name)
+  sig_up = temp %&gt;%  as.data.frame() %&gt;%  
+        dplyr::filter(FDR &lt; 0.05, logFC &gt; log2(1)) 
+  utr = table(sig_up$NIF_long_3utr)[2]
+  dej = table(sig_up$NIF_dEJ)[2]
+  uorf = table(sig_up$NIF_uORF)[2]
+  none = table(sig_up$nif_feature)[1]
+  total_nif_up  = rbind(utr, dej, uorf, none) %&gt;% 
+    as.data.frame() %&gt;% 
+    rownames_to_column(&quot;NIF_feature&quot;) %&gt;% 
+    mutate(Condition = name, 
+           Expression = &quot;Up&quot;) %&gt;% 
+    dplyr::rename(&quot;Count&quot; = &quot;1&quot;)
+  
+  message(&quot;Counting NIFs in downregulated transcripts for &quot;, name)
+  
+  sig_down = temp %&gt;%  as.data.frame() %&gt;%  
+        dplyr::filter(FDR &lt; 0.05, logFC &lt; log2(1)) 
+  utr = table(sig_down$NIF_long_3utr)[2]
+  dej = table(sig_down$NIF_dEJ)[2]
+  uorf = table(sig_down$NIF_uORF)[2]
+   none = table(sig_down$nif_feature)[1]
+  total_nif_down  = rbind(utr, dej, uorf, none) %&gt;% 
+    as.data.frame() %&gt;% 
+    rownames_to_column(&quot;NIF_feature&quot;) %&gt;% 
+    mutate(Condition = name, 
+           Expression = &quot;Down&quot;) %&gt;% 
+    dplyr::rename(&quot;Count&quot; = &quot;1&quot;)
+  
+  nif_features= rbind(nif_features, total_nif_up, total_nif_down, stringsAsFactors = FALSE)
+  
+}
+
+nif_features %&gt;%
+  mutate(NIF_feature = gsub(&quot;utr&quot;, &quot;Long 3&#39;UTR&quot;, NIF_feature), 
+         NIF_feature = gsub(&quot;uorf&quot;, &quot;Upstream ORF&quot;, NIF_feature), 
+         NIF_feature = gsub(&quot;dej&quot;, &quot;Downstream exon junction&quot;, NIF_feature),
+   Expression = factor(Expression, levels = c(&quot;Down&quot;, &quot;Up&quot;)), 
+          NIF_feature = factor(NIF_feature, levels = c(&quot;none&quot;,
+                                                             
+                                                             &quot;Upstream ORF&quot;,
+                                                             &quot;Long 3&#39;UTR&quot;,
+                                                       &quot;Downstream exon junction&quot;))) %&gt;%
+  
+  ggplot(aes(x= NIF_feature, y = Count, fill = Expression)) + 
+  geom_bar(stat = &quot;identity&quot;, position = &quot;stack&quot;, width = .5) + coord_flip() + 
+  theme_bw() +
+  facet_grid(~Condition)  +
+  xlab(&quot;&quot;) + ylab(&quot;&quot;) + scale_fill_manual(values = c(&quot;Up&quot;= &quot;#b23a48&quot;,
+                                                     &quot;Down&quot; = &quot;grey&quot;)) + 
+   
+     theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;, angle = 90),
+        axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;), 
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+         strip.text.x = element_text(
+        size = 12, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        ))</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>nif_features %&gt;%
+  mutate(NIF_feature = gsub(&quot;utr&quot;, &quot;Long 3&#39;UTR&quot;, NIF_feature), 
+         NIF_feature = gsub(&quot;uorf&quot;, &quot;Upstream ORF&quot;, NIF_feature), 
+         NIF_feature = gsub(&quot;dej&quot;, &quot;Downstream exon junction&quot;, NIF_feature),
+   Expression = factor(Expression, levels = c(&quot;Down&quot;, &quot;Up&quot;)), 
+          NIF_feature = factor(NIF_feature, levels = c(&quot;none&quot;,
+                                                             
+                                                             &quot;Upstream ORF&quot;,
+                                                             &quot;Long 3&#39;UTR&quot;,
+                                                       &quot;Downstream exon junction&quot;))) %&gt;% 
+  ggplot(aes(x= NIF_feature, y = Count, fill = Expression)) + 
+  geom_bar(stat = &quot;identity&quot;, position = &quot;fill&quot;, width = .5) + coord_flip() + 
+  theme_bw() +
+  facet_grid(~Condition)  +
+  xlab(&quot;&quot;) + ylab(&quot;&quot;) + scale_fill_manual(values = c(&quot;Up&quot;= &quot;#b23a48&quot;,
+                                                     &quot;Down&quot; = &quot;grey&quot;)) + 
+   
+     theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;, angle = 90),
+        axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;), 
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+         strip.text.x = element_text(
+        size = 12, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        )) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" /></p>
+<ul>
+<li>Impact on PTCs</li>
+</ul>
+<pre class="r"><code>res_dte$UPF1 %&gt;% 
+ #dplyr::filter(tx_id %in% upf1_transcript$tx_id) %&gt;% 
+  drop_na(NIF_dEJ) %&gt;%
+  mutate(sig = ifelse(NIF_dEJ == &quot;1&quot;, &quot;PTC+&quot;,
+                      ifelse(NIF_dEJ == &quot;0&quot;, &quot;PTC-&quot;, &quot;PTC-&quot;))) %&gt;%
+  ggplot(aes(x=logFC, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;PTC+&quot; = &quot;#CC503E&quot;,
+                               &quot;PTC-&quot; = &quot;#2F124B&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;UPF1 LCLs - PTC containing transcripts&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Log 2 fold change&quot;, 
+                                              color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20)) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>res_dte$FRAX %&gt;% 
+ #dplyr::filter(tx_id %in% upf1_transcript$tx_id) %&gt;% 
+  drop_na(NIF_dEJ) %&gt;%
+  mutate(sig = ifelse(NIF_dEJ == &quot;1&quot;, &quot;PTC+&quot;,
+                      ifelse(NIF_dEJ == &quot;0&quot;, &quot;PTC-&quot;, &quot;PTC-&quot;))) %&gt;%
+  ggplot(aes(x=logFC, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;PTC+&quot; = &quot;#CC503E&quot;,
+                               &quot;PTC-&quot; = &quot;#2F124B&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;FRAX LCLs - PTC containing transcripts&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Log 2 fold change&quot;, 
+                                              color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20))</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" /></p>
+<ul>
+<li>Length of 3’UTRs</li>
+</ul>
+<pre class="r"><code>res_dte$UPF1 %&gt;% 
+  mutate(sig = ifelse(logFC &gt; (0) &amp; FDR &lt; 0.05, &quot;Upregulated&quot;,
+                      ifelse(logFC &lt; 0 &amp; FDR &lt; 0.05, &quot;Downregulated&quot;, &quot;Not Significant&quot;))) %&gt;%
+  mutate(normalized_3utr = LENGTH_3utr/Length ) %&gt;%
+  ggplot(aes(x=LENGTH_3utr, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;Downregulated&quot; = &quot;#38A6A5&quot;,
+                               &quot;Upregulated&quot; = &quot;#CC503E&quot;,
+                               &quot;Not Significant&quot; = &quot;#E5E5E5&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;3&#39;UTR Length&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Length (bp)&quot;,
+                                 color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20)) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>res_dte$FRAX %&gt;% 
+  mutate(sig = ifelse(logFC &gt; (0) &amp; FDR &lt; 0.05, &quot;Upregulated&quot;,
+                      ifelse(logFC &lt; 0 &amp; FDR &lt; 0.05, &quot;Downregulated&quot;, &quot;Not Significant&quot;))) %&gt;%
+  mutate(normalized_3utr = LENGTH_3utr/Length ) %&gt;%
+  ggplot(aes(x=LENGTH_3utr, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;Downregulated&quot; = &quot;#38A6A5&quot;,
+                               &quot;Upregulated&quot; = &quot;#CC503E&quot;,
+                               &quot;Not Significant&quot; = &quot;#E5E5E5&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;3&#39;UTR Length&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Length (bp)&quot;,
+                                 color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20)) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-24-1.png" width="672" style="display: block; margin: auto;" /></p>
+<ul>
+<li>Overall GC content</li>
+</ul>
+<pre class="r"><code>res_dte$UPF1 %&gt;% 
+  left_join(transGR %&gt;%
+              as.data.frame() %&gt;%
+              dplyr::select(tx_id,gc_content), by = &quot;tx_id&quot;) %&gt;%
+  mutate(sig = ifelse(logFC &gt; (0) &amp; FDR &lt; 0.05, &quot;Upregulated&quot;,
+                      ifelse(logFC &lt; 0 &amp; FDR &lt; 0.05, &quot;Downregulated&quot;, &quot;Not Significant&quot;))) %&gt;%
+  ggplot(aes(x=gc_content, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;Downregulated&quot; = &quot;#38A6A5&quot;,
+                               &quot;Upregulated&quot; = &quot;#CC503E&quot;,
+                               &quot;Not Significant&quot; = &quot;#E5E5E5&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;UPF1 - GC content of transcripts&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Length (bp)&quot;,
+                                 color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20)) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-25-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>res_dte$FRAX %&gt;% 
+  left_join(transGR %&gt;%
+              as.data.frame() %&gt;%
+              dplyr::select(tx_id,gc_content), by = &quot;tx_id&quot;) %&gt;%
+  mutate(sig = ifelse(logFC &gt; (0) &amp; FDR &lt; 0.05, &quot;Upregulated&quot;,
+                      ifelse(logFC &lt; 0 &amp; FDR &lt; 0.05, &quot;Downregulated&quot;, &quot;Not Significant&quot;))) %&gt;%
+  ggplot(aes(x=gc_content, color = sig)) + stat_ecdf(geom = &quot;step&quot;, size=1.5) +
+ scale_color_manual(values = c(&quot;Downregulated&quot; = &quot;#38A6A5&quot;,
+                               &quot;Upregulated&quot; = &quot;#CC503E&quot;,
+                               &quot;Not Significant&quot; = &quot;#E5E5E5&quot;)) + theme_bw() +
+  ylab(&quot;Cumulative Frequency&quot;) + xlab(&quot;&quot;) + theme(legend.position = &quot;top&quot;) +
+  geom_hline(yintercept = c(1, 0),  linetype = &quot;dashed&quot;, color = &quot;grey&quot;) +
+  ggtitle(&quot;FRAX - GC content of transcripts&quot;) + labs(y = &quot;Cumulative frequency&quot;,
+                                              x = &quot;Length (bp)&quot;,
+                                 color = &quot;&quot;) +
+  theme(axis.text = element_text(size=12, colour = &quot;black&quot;, family = &quot;serif&quot;),
+            axis.title = element_text(size=15, family = &quot;serif&quot;),
+            legend.box.background = element_rect(color = &quot;black&quot;),
+            legend.text = element_text(family = &quot;serif&quot;),
+            legend.title = element_text( family = &quot;serif&quot;),
+            plot.title = element_text(family = &quot;serif&quot;, size =20)) </code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-26-1.png" width="672" style="display: block; margin: auto;" /></p>
+<ul>
+<li>Overlap of both types of analysis</li>
+</ul>
+<pre class="r"><code> res_dte$UPF1 %&gt;% 
+  dplyr::filter(FDR &lt; 0.05) %&gt;% 
+  dplyr::select(tx_id, logFC, nif_feature) %&gt;%
+  inner_join(res_dte$FRAX %&gt;% 
+                dplyr::filter(FDR &lt; 0.05) %&gt;%
+               dplyr::select(tx_id, logFC), by = &quot;tx_id&quot;) %&gt;%
+  mutate(sig= ifelse(nif_feature == &quot;None&quot;, &quot;NIF-&quot;, &quot;NIF+&quot;)) %&gt;%
+  ggscatter(.,x=&quot;logFC.x&quot;, y =&quot;logFC.y&quot;, cor.coef = TRUE, add = &quot;reg.line&quot;,
+              conf.int = TRUE, color = &quot;sig&quot;, add.params = list(color = &quot;blue&quot;,
+                                                 fill = &quot;lightgray&quot;), alpha =0.8, shape = &quot;sig&quot;, size =3) + 
+    theme_bw() + xlab(&quot;UPF1 DETs&quot;) +
+  #ylab(&quot;Upf3b DSG (log2FC)&quot;) +   scale_color_manual(values = c(&quot;#F15A2B&quot;, &quot;#2E368F&quot;)) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = &quot;dashed&quot;, color = &quot;grey60&quot;) +
+  geom_vline(xintercept = 0, size = 0.5, lty = &quot;dashed&quot;, color = &quot;grey60&quot;) + theme(legend.position = &quot;none&quot;) +
+  theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+            axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+        strip.text.y = element_text(
+        size = 10, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        ),
+         strip.text.x = element_text(
+        size = 10, family = &quot;serif&quot;
+        )) + labs(color = &quot;Expression&quot;) + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = &quot;y&quot;) +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) +  scale_fill_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) + scale_shape_manual(values = c(19,15)) + labs(y= &quot;FRAX DETs&quot;)</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-27-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code> res_dte$UPF1 %&gt;% 
+  dplyr::filter(FDR &lt; 0.05) %&gt;% 
+  dplyr::select(tx_id, logFC, nif_feature) %&gt;%
+  inner_join(res_dte$FRAX %&gt;% 
+                dplyr::filter(FDR &lt; 0.05) %&gt;%
+               dplyr::select(tx_id, logFC), by = &quot;tx_id&quot;) %&gt;%
+  mutate(sig= ifelse(nif_feature == &quot;None&quot;, &quot;NIF-&quot;, &quot;NIF+&quot;)) %&gt;%
+  ggscatter(.,x=&quot;logFC.x&quot;, y =&quot;logFC.y&quot;, cor.coef = TRUE, add = &quot;reg.line&quot;,
+              conf.int = TRUE, color = &quot;sig&quot;, add.params = list(color = &quot;blue&quot;,
+                                                 fill = &quot;lightgray&quot;), alpha =0.8, shape = &quot;sig&quot;, size =3) + 
+    theme_bw() + xlab(&quot;UPF1 DETs&quot;) +
+  #ylab(&quot;Upf3b DSG (log2FC)&quot;) +   scale_color_manual(values = c(&quot;#F15A2B&quot;, &quot;#2E368F&quot;)) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = &quot;dashed&quot;, color = &quot;grey60&quot;) +
+  geom_vline(xintercept = 0, size = 0.5, lty = &quot;dashed&quot;, color = &quot;grey60&quot;) + theme(legend.position = &quot;none&quot;) +
+  theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+            axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+        strip.text.y = element_text(
+        size = 10, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        ),
+         strip.text.x = element_text(
+        size = 10, family = &quot;serif&quot;
+        )) + labs(color = &quot;Expression&quot;) + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = &quot;y&quot;) +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) +  scale_fill_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) + scale_shape_manual(values = c(19,15)) + labs(y= &quot;FRAX DETs&quot;)</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-28-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="correlation-analysis-with-degs" class="section level3">
+<h3>Correlation analysis with DEGs</h3>
+<pre class="r"><code>load(&quot;output/DEG-results.Rda&quot;)</code></pre>
+<pre class="r"><code>res_dte$UPF1 %&gt;% 
+  dplyr::filter(FDR &lt; 0.05) %&gt;% 
+  left_join(tx2gene, by=&quot;tx_id&quot;) %&gt;% 
+  inner_join(upf1_results_lfc %&gt;% 
+               dplyr::filter(adj.P.Val &lt; 0.05) %&gt;%
+               dplyr::rename(&quot;gene_id&quot; = &quot;ensembl_gene_id&quot;), by=&quot;gene_id&quot;) %&gt;%
+    mutate(sig= ifelse(nif_feature == &quot;None&quot;, &quot;NIF-&quot;, &quot;NIF+&quot;)) %&gt;%
+  ggscatter(.,x=&quot;logFC.x&quot;, y =&quot;logFC.y&quot;, cor.coef = TRUE, add = &quot;reg.line&quot;,
+              conf.int = TRUE, color = &quot;sig&quot;, add.params = list(color = &quot;blue&quot;,
+                                                 fill = &quot;lightgray&quot;), alpha =0.8, shape = &quot;sig&quot;, size =3) + 
+    theme_bw() + xlab(&quot;UPF1 DETs&quot;) +
+  #ylab(&quot;Upf3b DSG (log2FC)&quot;) +   scale_color_manual(values = c(&quot;#F15A2B&quot;, &quot;#2E368F&quot;)) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = &quot;dashed&quot;, color = &quot;grey60&quot;) +
+  geom_vline(xintercept = 0, size = 0.5, lty = &quot;dashed&quot;, color = &quot;grey60&quot;) + theme(legend.position = &quot;none&quot;) +
+  theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+            axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+        strip.text.y = element_text(
+        size = 10, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        ),
+         strip.text.x = element_text(
+        size = 10, family = &quot;serif&quot;
+        )) + labs(color = &quot;Expression&quot;) + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = &quot;y&quot;) +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) +  scale_fill_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) + scale_shape_manual(values = c(19,15)) + labs(y= &quot;UPF1 DEGs&quot;)</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-30-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>res_dte$FRAX %&gt;% 
+  dplyr::filter(FDR &lt; 0.05) %&gt;% 
+  left_join(tx2gene, by=&quot;tx_id&quot;) %&gt;% 
+  inner_join(frax_results_lfc %&gt;% 
+               as.data.frame() %&gt;%
+               dplyr::filter(adj.P.Val &lt; 0.05) %&gt;%
+               dplyr::rename(&quot;gene_id&quot; = &quot;ensembl_gene_id&quot;), by=&quot;gene_id&quot;) %&gt;%
+    mutate(sig= ifelse(nif_feature == &quot;None&quot;, &quot;NIF-&quot;, &quot;NIF+&quot;)) %&gt;%
+  ggscatter(.,x=&quot;logFC.x&quot;, y =&quot;logFC.y&quot;, cor.coef = TRUE, add = &quot;reg.line&quot;,
+              conf.int = TRUE, color = &quot;sig&quot;, add.params = list(color = &quot;blue&quot;,
+                                                 fill = &quot;lightgray&quot;), alpha =0.8, shape = &quot;sig&quot;, size =3) + 
+    theme_bw() + xlab(&quot;FRAX DETs&quot;) +
+  #ylab(&quot;Upf3b DSG (log2FC)&quot;) +   scale_color_manual(values = c(&quot;#F15A2B&quot;, &quot;#2E368F&quot;)) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = &quot;dashed&quot;, color = &quot;grey60&quot;) +
+  geom_vline(xintercept = 0, size = 0.5, lty = &quot;dashed&quot;, color = &quot;grey60&quot;) + theme(legend.position = &quot;none&quot;) +
+  theme(axis.text.x = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+            axis.text.y = element_text(size = 12, family = &quot;serif&quot;, color = &quot;black&quot;),
+        axis.title = element_text(size=15, family = &quot;serif&quot;), 
+         legend.box.background = element_rect(color = &quot;black&quot;),
+          legend.text = element_text(family = &quot;serif&quot;), 
+          legend.title = element_text( family = &quot;serif&quot;),
+           plot.title = element_text(family = &quot;serif&quot;, size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = &quot;top&quot;,
+        strip.text.y = element_text(
+        size = 10, face = &quot;bold.italic&quot;, family = &quot;serif&quot;
+        ),
+         strip.text.x = element_text(
+        size = 10, family = &quot;serif&quot;
+        )) + labs(color = &quot;Expression&quot;) + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = &quot;y&quot;) +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) +  scale_fill_manual(values = c(&quot;NIF+&quot; = &quot;#b23a48&quot;,
+                                &quot;NIF-&quot; = &quot;grey&quot;)) + scale_shape_manual(values = c(19,15)) + labs(y= &quot;FRAX DEGs&quot;)</code></pre>
+<p><img src="figure/transcript-analysis.Rmd/unnamed-chunk-31-1.png" width="672" style="display: block; margin: auto;" /></p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.3.2 (2023-10-31)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 22.04.3 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0 
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
+
+locale:
+ [1] LC_CTYPE=en_AU.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_AU.UTF-8        LC_COLLATE=en_AU.UTF-8    
+ [5] LC_MONETARY=en_AU.UTF-8    LC_MESSAGES=en_AU.UTF-8   
+ [7] LC_PAPER=en_AU.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_AU.UTF-8 LC_IDENTIFICATION=C       
+
+time zone: Australia/Adelaide
+tzcode source: system (glibc)
+
+attached base packages:
+ [1] grid      stats4    tools     stats     graphics  grDevices utils    
+ [8] datasets  methods   base     
+
+other attached packages:
+ [1] ggrepel_0.9.5               bigPint_1.14.0             
+ [3] naniar_1.0.0                glmpca_0.2.0               
+ [5] broom_1.0.5                 cowplot_1.1.2              
+ [7] glue_1.7.0                  ggfortify_0.4.16           
+ [9] tidyquant_1.0.7             quantmod_0.4.25            
+[11] TTR_0.24.4                  PerformanceAnalytics_2.0.4 
+[13] xts_0.13.2                  zoo_1.8-12                 
+[15] GeneOverlap_1.38.0          fishpond_2.8.0             
+[17] EnsDb.Hsapiens.v86_2.99.0   ggstatsplot_0.12.2         
+[19] ggside_0.2.3                janitor_2.2.0              
+[21] stargazer_5.2.3             gplots_3.1.3               
+[23] coin_1.4-3                  survival_3.5-7             
+[25] ngsReports_2.4.0            patchwork_1.2.0            
+[27] AnnotationHub_3.10.0        BiocFileCache_2.10.1       
+[29] dbplyr_2.4.0                openxlsx_4.2.5.2           
+[31] ggiraph_0.8.8               DT_0.31                    
+[33] msigdb_1.10.0               GSEABase_1.64.0            
+[35] graph_1.80.0                annotate_1.80.0            
+[37] XML_3.99-0.16               pheatmap_1.0.12            
+[39] ggvenn_0.1.10               MetBrewer_0.2.0            
+[41] ggpubr_0.6.0                venn_1.12                  
+[43] viridis_0.6.4               viridisLite_0.4.2          
+[45] tximeta_1.20.2              tximport_1.30.0            
+[47] goseq_1.54.0                geneLenDataBase_1.38.0     
+[49] BiasedUrn_2.0.11            org.Mm.eg.db_3.18.0        
+[51] EnsDb.Mmusculus.v79_2.99.0  ensembldb_2.26.0           
+[53] AnnotationFilter_1.26.0     GenomicFeatures_1.54.1     
+[55] AnnotationDbi_1.64.1        biomaRt_2.58.0             
+[57] edgeR_4.0.11                limma_3.58.1               
+[59] DESeq2_1.42.0               SummarizedExperiment_1.32.0
+[61] Biobase_2.62.0              MatrixGenerics_1.14.0      
+[63] matrixStats_1.2.0           GenomicRanges_1.54.1       
+[65] GenomeInfoDb_1.38.5         IRanges_2.36.0             
+[67] S4Vectors_0.40.2            BiocGenerics_0.48.1        
+[69] corrplot_0.92               lubridate_1.9.3            
+[71] forcats_1.0.0               purrr_1.0.2                
+[73] readr_2.1.5                 tidyverse_2.0.0            
+[75] stringr_1.5.1               tidyr_1.3.0                
+[77] scales_1.3.0                data.table_1.14.10         
+[79] readxl_1.4.3                tibble_3.2.1               
+[81] magrittr_2.0.3              reshape2_1.4.4             
+[83] ggplot2_3.4.4               dplyr_1.1.4                
+[85] workflowr_1.7.1            
+
+loaded via a namespace (and not attached):
+  [1] vroom_1.6.5                   progress_1.2.3               
+  [3] nnet_7.3-19                   Biostrings_2.70.1            
+  [5] TH.data_1.1-2                 vctrs_0.6.5                  
+  [7] digest_0.6.34                 png_0.1-8                    
+  [9] git2r_0.33.0                  bayestestR_0.13.1            
+ [11] correlation_0.8.4             MASS_7.3-60.0.1              
+ [13] reshape_0.8.9                 httpuv_1.6.13                
+ [15] withr_3.0.0                   xfun_0.41                    
+ [17] ellipsis_0.3.2                memoise_2.0.1                
+ [19] hexbin_1.28.3                 emmeans_1.9.0                
+ [21] parameters_0.21.3             systemfonts_1.0.5            
+ [23] gtools_3.9.5                  Formula_1.2-5                
+ [25] prettyunits_1.2.0             GGally_2.2.0                 
+ [27] datawizard_0.9.1              rematch2_2.1.2               
+ [29] KEGGREST_1.42.0               promises_1.2.1               
+ [31] httr_1.4.7                    rstatix_0.7.2                
+ [33] restfulr_0.0.15               ps_1.7.6                     
+ [35] rstudioapi_0.15.0             generics_0.1.3               
+ [37] base64enc_0.1-3               processx_3.8.3               
+ [39] curl_5.2.0                    zlibbioc_1.48.0              
+ [41] GenomeInfoDbData_1.2.11       quadprog_1.5-8               
+ [43] SparseArray_1.2.3             interactiveDisplayBase_1.40.0
+ [45] xtable_1.8-4                  evaluate_0.23                
+ [47] S4Arrays_1.2.0                hms_1.1.3                    
+ [49] colorspace_2.1-0              filelock_1.0.3               
+ [51] snakecase_0.11.1              later_1.3.2                  
+ [53] modeltools_0.2-23             lattice_0.22-5               
+ [55] getPass_0.2-4                 Hmisc_5.1-1                  
+ [57] pillar_1.9.0                  nlme_3.1-164                 
+ [59] caTools_1.18.2                compiler_4.3.2               
+ [61] shinycssloaders_1.0.0         stringi_1.8.3                
+ [63] GenomicAlignments_1.38.2      plyr_1.8.9                   
+ [65] crayon_1.5.2                  abind_1.4-5                  
+ [67] BiocIO_1.12.0                 ggdendro_0.1.23              
+ [69] locfit_1.5-9.8                bit_4.0.5                    
+ [71] sandwich_3.1-0                libcoin_1.0-10               
+ [73] whisker_0.4.1                 codetools_0.2-19             
+ [75] multcomp_1.4-25               bslib_0.6.1                  
+ [77] paletteer_1.6.0               plotly_4.10.4                
+ [79] mime_0.12                     splines_4.3.2                
+ [81] Quandl_2.11.0                 Rcpp_1.0.12                  
+ [83] cellranger_1.1.0              knitr_1.45                   
+ [85] blob_1.2.4                    utf8_1.2.4                   
+ [87] here_1.0.1                    BiocVersion_3.18.1           
+ [89] fs_1.6.3                      checkmate_2.3.1              
+ [91] admisc_0.34                   ggsignif_0.6.4               
+ [93] estimability_1.4.1            Matrix_1.6-5                 
+ [95] callr_3.7.3                   statmod_1.5.0                
+ [97] tzdb_0.4.0                    visdat_0.6.0                 
+ [99] pkgconfig_2.0.3               cachem_1.0.8                 
+[101] RSQLite_2.3.5                 DBI_1.2.1                    
+[103] fastmap_1.1.1                 rmarkdown_2.25               
+[105] shinydashboard_0.7.2          Rsamtools_2.18.0             
+[107] sass_0.4.8                    coda_0.19-4                  
+[109] BiocManager_1.30.22           ggstats_0.5.1                
+[111] insight_0.19.7                carData_3.0-5                
+[113] rpart_4.1.23                  farver_2.1.1                 
+[115] mgcv_1.9-1                    yaml_2.3.8                   
+[117] foreign_0.8-86                rtracklayer_1.62.0           
+[119] cli_3.6.2                     lifecycle_1.0.4              
+[121] mvtnorm_1.2-4                 backports_1.4.1              
+[123] BiocParallel_1.36.0           timechange_0.3.0             
+[125] gtable_0.3.4                  rjson_0.2.21                 
+[127] parallel_4.3.2                jsonlite_1.8.8               
+[129] bitops_1.0-7                  svMisc_1.2.3                 
+[131] bit64_4.0.5                   zip_2.3.0                    
+[133] highr_0.10                    jquerylib_0.1.4              
+[135] zeallot_0.1.0                 lazyeval_0.2.2               
+[137] pander_0.6.5                  shiny_1.8.0                  
+[139] htmltools_0.5.7               GO.db_3.18.0                 
+[141] rappdirs_0.3.3                XVector_0.42.0               
+[143] RCurl_1.98-1.14               rprojroot_2.0.4              
+[145] gridExtra_2.3                 R6_2.5.1                     
+[147] SingleCellExperiment_1.24.0   labeling_0.4.3               
+[149] cluster_2.1.6                 DelayedArray_0.28.0          
+[151] tidyselect_1.2.0              ProtGenerics_1.34.0          
+[153] htmlTable_2.4.2               xml2_1.3.6                   
+[155] car_3.1-2                     statsExpressions_1.5.3       
+[157] munsell_0.5.0                 KernSmooth_2.23-22           
+[159] htmlwidgets_1.6.4             RColorBrewer_1.1-3           
+[161] rlang_1.1.3                   uuid_1.2-0                   
+[163] fansi_1.0.6                  </code></pre>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
