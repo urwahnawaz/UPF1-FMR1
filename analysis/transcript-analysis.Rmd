@@ -1,7 +1,7 @@
 ---
 title: "transcript-analysis"
 author: "urwahnawaz"
-date: "2024-01-23"
+date: "2024-01-10"
 output: 
   html_notebook: default
   workflowr::wflow_html:
@@ -220,9 +220,6 @@ summary(fit$df.prior)
 
 
 ```{r}
-
-
-
 res_dte = list()
 
 temp = glmQLFTest(fit, coef=4)
@@ -306,32 +303,32 @@ for (i in names(res_dte)){
 
 
 ### Distribution of results 
-```{r}
-plot_hist = function(df, comparison, legend = FALSE){
-  ggplot(data= df, aes(x=PValue)) + geom_histogram(fill = "grey", color="black") + theme_bw() + xlab("Pvalue") + ylab("Frequency")
-}
-plot_fc = function(df){
-  df %>% 
-    dplyr::filter(FDR < 0.05) %>%  
-    ggplot(aes(x=logFC)) + 
-    geom_histogram(aes(y=..density..), colour="black", fill="white") +  
-    geom_density(alpha=.2, fill="#FF6666") + geom_vline(xintercept =c(log2(1.5), -log2(1.5)),color="red", linetype = "dashed")
-}
-```
-
-```{r fig.cap= "Log fold change distribution of UPF1"}
-plot_fc(res_dte$UPF1) 
-
-```
-
-```{r fig.cap= "Log fold change distribution of FRAX"}
-plot_fc(res_dte$FRAX)
-```
-
-```{r}
-a = plot_hist(res_dte$UPF3B_KD_Control) + ggtitle("(a) UPF3B KD vs Control")
-b = plot_hist(res_dte$UPF3A_KD_Control) + ggtitle("(b) UPF3A KD vs Control")
-```
+<!-- # ```{r} -->
+<!-- # plot_hist = function(df, comparison, legend = FALSE){ -->
+<!-- #   ggplot(data= df, aes(x=PValue)) + geom_histogram(fill = "grey", color="black") + theme_bw() + xlab("Pvalue") + ylab("Frequency") -->
+<!-- # } -->
+<!-- # plot_fc = function(df){ -->
+<!-- #   df %>%  -->
+<!-- #     dplyr::filter(FDR < 0.05) %>%   -->
+<!-- #     ggplot(aes(x=logFC)) +  -->
+<!-- #     geom_histogram(aes(y=..density..), colour="black", fill="white") +   -->
+<!-- #     geom_density(alpha=.2, fill="#FF6666") + geom_vline(xintercept =c(log2(1.5), -log2(1.5)),color="red", linetype = "dashed") -->
+<!-- # } -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r fig.cap= "Log fold change distribution of UPF1"} -->
+<!-- # plot_fc(res_dte$UPF1)  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r fig.cap= "Log fold change distribution of FRAX"} -->
+<!-- # plot_fc(res_dte$FRAX) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # a = plot_hist(res_dte$UPF3B_KD_Control) + ggtitle("(a) UPF3B KD vs Control") -->
+<!-- # b = plot_hist(res_dte$UPF3A_KD_Control) + ggtitle("(b) UPF3A KD vs Control") -->
+<!-- # ``` -->
 
 - UPF1
 ```{r fig.cap= "Differentially expressed transcripts with NIFs for UPF1"}
@@ -524,7 +521,7 @@ res_dte$UPF1 %>%
                                "Not Significant" = "#E5E5E5")) + theme_bw() +
   ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
   geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
-  ggtitle("3'UTR Length") + labs(y = "Cumulative frequency",
+  ggtitle("UPF1 3'UTR Length") + labs(y = "Cumulative frequency",
                                               x = "Length (bp)",
                                  color = "") +
   theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
@@ -547,7 +544,7 @@ res_dte$FRAX %>%
                                "Not Significant" = "#E5E5E5")) + theme_bw() +
   ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
   geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
-  ggtitle("3'UTR Length") + labs(y = "Cumulative frequency",
+  ggtitle("FRAX 3'UTR Length") + labs(y = "Cumulative frequency",
                                               x = "Length (bp)",
                                  color = "") +
   theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
@@ -613,7 +610,7 @@ res_dte$FRAX %>%
 
 - Overlap of both types of analysis 
 
-```{r}
+```{r fig.cap= "Overlap of significantly expressed DETs from FRAX and UPF1"}
  res_dte$UPF1 %>% 
   dplyr::filter(FDR < 0.05) %>% 
   dplyr::select(tx_id, logFC, nif_feature) %>%
@@ -651,45 +648,6 @@ res_dte$FRAX %>%
                                 "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX DETs")
 ```
 
-
-
-```{r}
- res_dte$UPF1 %>% 
-  dplyr::filter(FDR < 0.05) %>% 
-  dplyr::select(tx_id, logFC, nif_feature) %>%
-  inner_join(res_dte$FRAX %>% 
-                dplyr::filter(FDR < 0.05) %>%
-               dplyr::select(tx_id, logFC), by = "tx_id") %>%
-  mutate(sig= ifelse(nif_feature == "None", "NIF-", "NIF+")) %>%
-  ggscatter(.,x="logFC.x", y ="logFC.y", cor.coef = TRUE, add = "reg.line",
-              conf.int = TRUE, color = "sig", add.params = list(color = "blue",
-                                                 fill = "lightgray"), alpha =0.8, shape = "sig", size =3) + 
-    theme_bw() + xlab("UPF1 DETs") +
-  #ylab("Upf3b DSG (log2FC)") +   scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
-    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
-  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=15, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = "y") +
-   theme(ggside.panel.scale = .3) +
-  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
-  scale_color_manual(values = c("NIF+" = "#b23a48",
-                                "NIF-" = "grey")) +  scale_fill_manual(values = c("NIF+" = "#b23a48",
-                                "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX DETs")
-```
 
 
 
@@ -697,6 +655,8 @@ res_dte$FRAX %>%
 ```{r}
 load("output/DEG-results.Rda")
 ```
+
+- UPF1 DEGs and DETs 
 
 ```{r}
 res_dte$UPF1 %>% 
@@ -738,6 +698,7 @@ res_dte$UPF1 %>%
 ```
 
 
+- FRAX DEGs and DETs 
 ```{r}
 res_dte$FRAX %>% 
   dplyr::filter(FDR < 0.05) %>% 
@@ -778,3 +739,39 @@ res_dte$FRAX %>%
   
 ```
 
+
+<!-- ### Transcripts  -->
+
+<!-- - UPF1  -->
+
+<!-- ```{r} -->
+<!-- library(pander) -->
+<!-- res_dte$UPF1 %>%  -->
+<!--   dplyr::filter(FDR < 0.05) %>% -->
+<!--   left_join(transGR %>% -->
+<!--               as.data.frame() %>% -->
+<!--               dplyr::select(tx_id,gc_content), by = "tx_id") %>% -->
+<!--   left_join(tx2gene, by = "tx_id") %>% -->
+<!--    mutate(gene_symbol = mapIds(org.Hs.eg.db, keys=gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first")) %>% -->
+<!--    mutate(Expression = ifelse(logFC > 0 & FDR < 0.05, "Upregulated",  -->
+<!--                       ifelse(logFC < 0  & FDR < 0.05, "Downregulated", "NotSig"))) %>% -->
+<!--   dplyr::select(gene_symbol,tx_id,Expression, logFC, NIF_dEJ, NIF_uORF, LENGTH_3utr, gc_content) %>% -->
+<!--   DT::datatable(caption="DEGs in FRAX relative to controls using limma/voom pipeline")  -->
+
+<!-- ``` -->
+
+<!-- -FRAX  -->
+
+<!-- ```{r} -->
+<!-- res_dte$FRAX %>%  -->
+<!--    dplyr::filter(FDR < 0.05) %>% -->
+<!--   left_join(transGR %>% -->
+<!--               as.data.frame() %>% -->
+<!--               dplyr::select(tx_id,gc_content), by = "tx_id") %>% -->
+<!--   left_join(tx2gene, by = "tx_id") %>% -->
+<!--    mutate(gene_symbol = mapIds(org.Hs.eg.db, keys=gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first")) %>% -->
+<!--    mutate(Expression = ifelse(logFC > 0 & FDR < 0.05, "Upregulated",  -->
+<!--                       ifelse(logFC < 0  & FDR < 0.05, "Downregulated", "NotSig"))) %>% -->
+<!--   dplyr::select(gene_symbol,tx_id,Expression, logFC, NIF_dEJ, NIF_uORF, LENGTH_3utr, gc_content) %>% -->
+<!--   DT::datatable(caption="DEGs in FRAX relative to controls using limma/voom pipeline", options = list())  -->
+<!-- ``` -->
