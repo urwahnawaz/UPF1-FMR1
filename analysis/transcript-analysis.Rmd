@@ -1,0 +1,780 @@
+---
+title: "transcript-analysis"
+author: "urwahnawaz"
+date: "2024-01-23"
+output: 
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+```{r}
+source("code/libraries.R")
+library(coin)
+library(gplots)
+library(stargazer)
+library(janitor)
+library(ggside)
+library(ggstatsplot)
+library(EnsDb.Hsapiens.v86)
+library(fishpond)
+library(tximeta)
+library(GeneOverlap)
+library(ggside)
+library(tidyquant)
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(bigPint)
+library(ggrepel)
+```
+
+
+```{r}
+txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
+
+ah <- AnnotationHub() %>%
+    subset(species == "Homo sapiens") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = genes(ensDb)
+transGR = transcripts(ensDb)
+```
+
+```{r nifs}
+NMD_features = read.table("/home/neuro/Documents/NMD_analysis/Analysis/databases/nif_finder/Output/Homo_sapiens.GRCh38.105/Homo_sapiens.GRCh38.105__nifs.tsv", sep = "\t", skip =1)
+
+colnames(NMD_features) = c("tx_id",	"NIF_dEJ", "NIF_uORF",	"NIF_long_3utr", "NIF|__|GC(cds[-10:termination_codon])",	"GC_5utr",	"GC_cds",	"GC_3utr",	"GC_exons",	"GC_introns",	"LENGTH_5utr", 	"LENGTH_cds",	"LENGTH_3utr",	"LENGTH_exons", "LENGTH_introns", "EXONS_count",	"dEJs|__|penultimate-exon>=55(nts)",	"uORFs|__|count",	"uORFs|__|gc-content",	"uORFs|__|lengths", "uORFs|__|max-length")
+
+NMD_features$NIF_dEJ = ifelse(NMD_features$NIF_dEJ == "True",gsub("True", 1, NMD_features$NIF_dEJ), 0)
+NMD_features$NIF_uORF = ifelse(NMD_features$NIF_uORF == "True",gsub("True", 1, NMD_features$NIF_uORF), 0)
+NMD_features$NIF_long_3utr = ifelse(NMD_features$NIF_long_3utr == "True",gsub("True", 1, NMD_features$NIF_long_3utr), 0)
+NMD_features %<>% mutate_at(.vars = "tx_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+
+NMD_features$NIF_dEJ[is.na(NMD_features$NIF_dEJ)] <- 0
+NMD_features$NIF_uORF[is.na(NMD_features$NIF_uORF)] <- 0
+NMD_features$NIF_long_3utr[is.na(NMD_features$NIF_long_3utr)] <- 0
+
+```
+
+```{r}
+nif_ma_plot = function(data){
+  DEColours <- c("NIF-" = "#14213d","NIF+" = "#ff6700",  "Not Sig" = "#e6e8e6")
+  temp = data %>% 
+    mutate(nif_label = ifelse(nif_feature != "None" & FDR < 0.05, "NIF+",        
+               ifelse(nif_feature == "None" & FDR < 0.05, "NIF-", "Not Sig")))
+  plot = temp %>% 
+    ggplot(aes(y= logFC,
+               x = logCPM,
+               colour = as.factor(as.character(nif_label)),
+               size= nif_label)) +
+    geom_point(alpha = 0.5) +
+    scale_colour_manual(values = DEColours) + theme_bw()+
+    theme(legend.position = "top",
+          axis.title.y = element_text(size = 12)) + geom_hline(yintercept = 0, 
+                                                               linetype = "dashed", color = "grey") +
+    geom_ysidedensity(aes(x=after_stat(density),  
+                             color = nif_label, fill = nif_label),  alpha=0.2, size = 1) +
+    scale_fill_manual(values = DEColours) + scale_size_manual(values = c("NIF+" = 3, 
+                                                                         "NIF-" =2,
+                                                                         "Not Sig"= 2)) +
+    theme(ggside.panel.scale.y = 0.2,
+        axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+         strip.text.x = element_text(
+        size = 12, face = "bold.italic", family = "serif"
+        )) + labs(color = "Presence of NMD inducible feature", 
+                  fill = "",
+                  size = "") + scale_alpha(guide = 'none')
+  return(plot)
+    
+}
+```
+
+```{r}
+salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon")
+salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
+
+salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
+all_files = file.path(salmon, "quant.sf")
+sample_names = gsub("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/", "", salmon)
+sample_names = gsub(".gz_transcripts", "", sample_names)
+sample_names = gsub("\\_.*", "", sample_names)
+names(all_files) <- sample_names
+names(salmon) <- sample_names
+md = read.csv(here::here("data/Sample_info.csv"), header= TRUE) %>%  
+  #mutate(files = file.path(salmon, "quant.sf")) %>% 
+  dplyr::rename("names" = "GeneWiz.ID", 
+                "Group" = "Sample.type") %>% 
+  mutate(Group = ifelse(Group == "MC" | Group == "FC", "Control", Group)) %>%
+  dplyr::select(names,everything()) %>% 
+  mutate(names = gsub("\\_.*", "", names) )
+md = md[order(match(md$names, sample_names)),]
+md %<>% 
+  rownames_to_column("random") %>% 
+#  column_to_rownames("names") %>%
+  dplyr::select(-random) %>%
+  mutate(files = all_files)
+
+md %<>% dplyr::filter(Group != "FMR1") %>%
+ dplyr::filter(names != "23-LDJ6767") %>%
+dplyr::filter(names != "202")
+all_files = all_files[names(all_files) %in% md$names]
+
+salmon = salmon[names(salmon) %in% md$names]
+```
+
+```{r}
+catch <- catchSalmon(salmon)
+colnames(catch$counts) =  md$names
+
+cts.scaled = catch$counts/catch$annotation$Overdispersion
+
+dge <- DGEList(counts = cts.scaled, 
+               genes=catch$annotation, 
+               samples = md,
+               group = md$Group)
+
+keep <- filterByExpr(dge)
+dge.scaled.filtr <- dge[keep, , keep.lib.sizes = FALSE]
+dge.scaled.filtr <- calcNormFactors(dge.scaled.filtr)
+
+dim(dge.scaled.filtr$counts)
+```
+
+
+```{r}
+cpm(dge.scaled.filtr, log = TRUE) %>% 
+  t() %>% 
+    prcomp(scale = TRUE) %>% 
+  tidy() %>% 
+  dplyr::rename(names = row) %>% 
+  left_join(dge.scaled.filtr$samples, by = "names") %>%
+   dplyr::filter(PC %in% 1:3) %>% 
+  pivot_wider(names_from = "PC", names_prefix = "PC", values_from = "value") %>% 
+  ggplot(aes(PC1, PC2, colour = Group, size = lib.size/1e6, shape = Sex)) +
+  geom_point() + geom_text_repel(aes(label = names), show.legend = FALSE)
+```
+
+```{r fig.height=5, fig.width=5}
+ plotMDS(dge.scaled.filtr,col=as.numeric(dge.scaled.filtr$samples$group))
+```
+
+# DET analysis
+
+```{r fig.height=6, fig.width=6, fig.cap= "*Biological coeficcient of variation plot against the average abundance of each transcript. The plot shows the square-root estimates of the common, trended and tagwise NB dispersions.*"}
+design <-  model.matrix(~Batch +Group + Sex, data = md) %>% 
+    set_colnames(gsub(pattern = "Group", replacement ="", x = colnames(.)))
+
+dge.scaled.filtr <- estimateDisp(dge.scaled.filtr,design)
+
+dge.scaled.filtr$common.dispersion
+
+plotBCV(dge.scaled.filtr)
+```
+
+
+```{r fig.height=6, fig.width=6, fig.cap="*Quasi-likelihood dispersion aganist gene abundance. Estimates are shown for raw, tended and squeezed dispersions*"}
+fit <- glmQLFit(dge.scaled.filtr,design)
+plotQLDisp(fit)
+```
+
+```{r}
+summary(fit$df.prior)
+```
+
+
+```{r}
+
+
+
+res_dte = list()
+
+temp = glmQLFTest(fit, coef=4)
+res_dte$UPF1 = topTags(temp,n = Inf) %>% 
+  as.data.frame() %>% rownames_to_column("tx_id") %>%
+    left_join(decideTestsDGE(temp) %>%
+                  as.data.frame() %>%
+                  set_colnames(c("Results")) %>%
+                  rownames_to_column("tx_id"))
+
+temp = glmQLFTest(fit, coef=3)
+res_dte$FRAX = topTags(temp,n = Inf) %>% 
+  as.data.frame() %>% rownames_to_column("tx_id") %>%
+    left_join(decideTestsDGE(temp) %>%
+                  as.data.frame() %>%
+                  set_colnames(c("Results")) %>%
+                  rownames_to_column("tx_id"))
+
+```
+
+```{r}
+total = data.frame()
+for (i in names(res_dte)){
+    name = i
+    #comparison = rep(name, 4) %>% as.data.frame()
+    temp = res_dte[[i]]
+    
+    message("Merging DE results with NMD table for", paste(name))
+    temp %<>%  as.data.frame() %>%
+      mutate(tx_version = tx_id) %>%
+      mutate_at(.vars = "tx_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "") %>% 
+      left_join(NMD_features, by = "tx_id")
+    
+    message("Summing all NMD values to determine number of NIFs per transcript for", paste0(name))
+    temp$nif_feature = ifelse(rowSums(sapply(temp[, c(12:14)],
+                       function(x) as.numeric(as.character(x)))) == 2 ,"Two",
+                       ifelse(rowSums(sapply(temp[, c(12:14)],
+                              function(x) as.numeric(as.character(x)))) == 3, "Three", 
+                              ifelse(rowSums(sapply(temp[, c(12:14)],
+                                                    function(x) as.numeric(as.character(x)))) == 1, "One", "None")))
+    
+    temp$nif_feature %<>%  replace_na("None")
+    res_dte[[paste(name)]] = temp
+    
+    ## downregulation 
+    message("Subsetting downregulated genes for ", paste0(name))
+    down = temp %>%  as.data.frame() %>%  
+        dplyr::filter(FDR < 0.05 & logFC < 0) 
+    down = table(down$nif_feature)
+    print(nrow(down))
+    repetition = down %>% nrow() %>% as.integer()
+    expression = rep(c("down"), repetition) %>% as.data.frame()
+    comparison = rep(name, nrow(expression)) %>% as.data.frame()
+    down = cbind(down, expression = expression)
+    down = cbind(down, comparison = comparison)
+    colnames(down) = c("NIF", "Value", "Expression", "Condition")
+    
+    ## upregulation 
+    message("Subsetting upregulated genes for ", paste0(name))
+    up = temp %>%  as.data.frame() %>%  
+        dplyr::filter(FDR < 0.05 & logFC > 0 ) 
+    up = table(up$nif_feature)
+    print(dim(up))
+    repetition = up %>% nrow() %>% as.integer()
+    expression = rep(c("up"), repetition) %>% as.data.frame()
+    comparison = rep(name, nrow(expression)) %>% as.data.frame()
+    up = cbind(up, expression = expression)
+    up = cbind(up, comparison = comparison)
+    colnames(up) = c("NIF", "Value", "Expression", "Condition")
+    
+    ## bind everything together 
+    message("Binding everything together")
+    #together = rbind(up, down)
+   
+    #total = rbind(total,as.data.frame(up,down))
+    total = rbind(total,up,down, stringsAsFactors = FALSE)
+}
+
+
+```
+
+
+### Distribution of results 
+```{r}
+plot_hist = function(df, comparison, legend = FALSE){
+  ggplot(data= df, aes(x=PValue)) + geom_histogram(fill = "grey", color="black") + theme_bw() + xlab("Pvalue") + ylab("Frequency")
+}
+plot_fc = function(df){
+  df %>% 
+    dplyr::filter(FDR < 0.05) %>%  
+    ggplot(aes(x=logFC)) + 
+    geom_histogram(aes(y=..density..), colour="black", fill="white") +  
+    geom_density(alpha=.2, fill="#FF6666") + geom_vline(xintercept =c(log2(1.5), -log2(1.5)),color="red", linetype = "dashed")
+}
+```
+
+```{r fig.cap= "Log fold change distribution of UPF1"}
+plot_fc(res_dte$UPF1) 
+
+```
+
+```{r fig.cap= "Log fold change distribution of FRAX"}
+plot_fc(res_dte$FRAX)
+```
+
+```{r}
+a = plot_hist(res_dte$UPF3B_KD_Control) + ggtitle("(a) UPF3B KD vs Control")
+b = plot_hist(res_dte$UPF3A_KD_Control) + ggtitle("(b) UPF3A KD vs Control")
+```
+
+- UPF1
+```{r fig.cap= "Differentially expressed transcripts with NIFs for UPF1"}
+ma_1 = nif_ma_plot(res_dte$UPF1) + ggtitle("UPF1DETs") +
+  annotate("label", x =10, y = 4, label = "Upregulated= 287") +
+  annotate("label", x =10, y = -4, label = "Downregulated =265")
+
+ma_1
+```
+
+
+-FRAX 
+```{r fig.cap= "Differentially expressed transcripts with NIFs for FRAX"}
+ma_1 = nif_ma_plot(res_dte$FRAX) + ggtitle("FRAX DETs") +
+  annotate("label", x =10, y = 4, label = "Upregulated= 3694") +
+  annotate("label", x =10, y = -4, label = "Downregulated =947")
+
+ma_1
+```
+
+
+- NIF features in the analysis 
+
+```{r}
+nif_features = list()
+for (i in names(res_dte)){
+  name = i
+  temp = res_dte[[i]]
+  
+  message("Counting NIFs in upregulated transcripts for ", name)
+  sig_up = temp %>%  as.data.frame() %>%  
+        dplyr::filter(FDR < 0.05, logFC > log2(1)) 
+  utr = table(sig_up$NIF_long_3utr)[2]
+  dej = table(sig_up$NIF_dEJ)[2]
+  uorf = table(sig_up$NIF_uORF)[2]
+  none = table(sig_up$nif_feature)[1]
+  total_nif_up  = rbind(utr, dej, uorf, none) %>% 
+    as.data.frame() %>% 
+    rownames_to_column("NIF_feature") %>% 
+    mutate(Condition = name, 
+           Expression = "Up") %>% 
+    dplyr::rename("Count" = "1")
+  
+  message("Counting NIFs in downregulated transcripts for ", name)
+  
+  sig_down = temp %>%  as.data.frame() %>%  
+        dplyr::filter(FDR < 0.05, logFC < log2(1)) 
+  utr = table(sig_down$NIF_long_3utr)[2]
+  dej = table(sig_down$NIF_dEJ)[2]
+  uorf = table(sig_down$NIF_uORF)[2]
+   none = table(sig_down$nif_feature)[1]
+  total_nif_down  = rbind(utr, dej, uorf, none) %>% 
+    as.data.frame() %>% 
+    rownames_to_column("NIF_feature") %>% 
+    mutate(Condition = name, 
+           Expression = "Down") %>% 
+    dplyr::rename("Count" = "1")
+  
+  nif_features= rbind(nif_features, total_nif_up, total_nif_down, stringsAsFactors = FALSE)
+  
+}
+
+nif_features %>%
+  mutate(NIF_feature = gsub("utr", "Long 3'UTR", NIF_feature), 
+         NIF_feature = gsub("uorf", "Upstream ORF", NIF_feature), 
+         NIF_feature = gsub("dej", "Downstream exon junction", NIF_feature),
+   Expression = factor(Expression, levels = c("Down", "Up")), 
+          NIF_feature = factor(NIF_feature, levels = c("none",
+                                                             
+                                                             "Upstream ORF",
+                                                             "Long 3'UTR",
+                                                       "Downstream exon junction"))) %>%
+  
+  ggplot(aes(x= NIF_feature, y = Count, fill = Expression)) + 
+  geom_bar(stat = "identity", position = "stack", width = .5) + coord_flip() + 
+  theme_bw() +
+  facet_grid(~Condition)  +
+  xlab("") + ylab("") + scale_fill_manual(values = c("Up"= "#b23a48",
+                                                     "Down" = "grey")) + 
+   
+     theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+         strip.text.x = element_text(
+        size = 12, face = "bold.italic", family = "serif"
+        ))
+```
+
+
+```{r}
+nif_features %>%
+  mutate(NIF_feature = gsub("utr", "Long 3'UTR", NIF_feature), 
+         NIF_feature = gsub("uorf", "Upstream ORF", NIF_feature), 
+         NIF_feature = gsub("dej", "Downstream exon junction", NIF_feature),
+   Expression = factor(Expression, levels = c("Down", "Up")), 
+          NIF_feature = factor(NIF_feature, levels = c("none",
+                                                             
+                                                             "Upstream ORF",
+                                                             "Long 3'UTR",
+                                                       "Downstream exon junction"))) %>% 
+  ggplot(aes(x= NIF_feature, y = Count, fill = Expression)) + 
+  geom_bar(stat = "identity", position = "fill", width = .5) + coord_flip() + 
+  theme_bw() +
+  facet_grid(~Condition)  +
+  xlab("") + ylab("") + scale_fill_manual(values = c("Up"= "#b23a48",
+                                                     "Down" = "grey")) + 
+   
+     theme(axis.text.x = element_text(size = 12, family = "serif", color = "black", angle = 90),
+        axis.text.y = element_text(size = 12, family = "serif", color = "black"), 
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+         strip.text.x = element_text(
+        size = 12, face = "bold.italic", family = "serif"
+        )) 
+```
+
+
+- Impact on PTCs 
+
+```{r}
+res_dte$UPF1 %>% 
+ #dplyr::filter(tx_id %in% upf1_transcript$tx_id) %>% 
+  drop_na(NIF_dEJ) %>%
+  mutate(sig = ifelse(NIF_dEJ == "1", "PTC+",
+                      ifelse(NIF_dEJ == "0", "PTC-", "PTC-"))) %>%
+  ggplot(aes(x=logFC, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("PTC+" = "#CC503E",
+                               "PTC-" = "#2F124B")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("UPF1 LCLs - PTC containing transcripts") + labs(y = "Cumulative frequency",
+                                              x = "Log 2 fold change", 
+                                              color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20)) 
+
+```
+
+
+```{r}
+res_dte$FRAX %>% 
+ #dplyr::filter(tx_id %in% upf1_transcript$tx_id) %>% 
+  drop_na(NIF_dEJ) %>%
+  mutate(sig = ifelse(NIF_dEJ == "1", "PTC+",
+                      ifelse(NIF_dEJ == "0", "PTC-", "PTC-"))) %>%
+  ggplot(aes(x=logFC, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("PTC+" = "#CC503E",
+                               "PTC-" = "#2F124B")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("FRAX LCLs - PTC containing transcripts") + labs(y = "Cumulative frequency",
+                                              x = "Log 2 fold change", 
+                                              color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20))
+
+```
+
+- Length of 3'UTRs 
+
+```{r}
+res_dte$UPF1 %>% 
+  mutate(sig = ifelse(logFC > (0) & FDR < 0.05, "Upregulated",
+                      ifelse(logFC < 0 & FDR < 0.05, "Downregulated", "Not Significant"))) %>%
+  mutate(normalized_3utr = LENGTH_3utr/Length ) %>%
+  ggplot(aes(x=LENGTH_3utr, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("Downregulated" = "#38A6A5",
+                               "Upregulated" = "#CC503E",
+                               "Not Significant" = "#E5E5E5")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("3'UTR Length") + labs(y = "Cumulative frequency",
+                                              x = "Length (bp)",
+                                 color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20)) 
+```
+
+
+```{r}
+res_dte$FRAX %>% 
+  mutate(sig = ifelse(logFC > (0) & FDR < 0.05, "Upregulated",
+                      ifelse(logFC < 0 & FDR < 0.05, "Downregulated", "Not Significant"))) %>%
+  mutate(normalized_3utr = LENGTH_3utr/Length ) %>%
+  ggplot(aes(x=LENGTH_3utr, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("Downregulated" = "#38A6A5",
+                               "Upregulated" = "#CC503E",
+                               "Not Significant" = "#E5E5E5")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("3'UTR Length") + labs(y = "Cumulative frequency",
+                                              x = "Length (bp)",
+                                 color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20)) 
+```
+
+
+- Overall GC content 
+
+```{r}
+res_dte$UPF1 %>% 
+  left_join(transGR %>%
+              as.data.frame() %>%
+              dplyr::select(tx_id,gc_content), by = "tx_id") %>%
+  mutate(sig = ifelse(logFC > (0) & FDR < 0.05, "Upregulated",
+                      ifelse(logFC < 0 & FDR < 0.05, "Downregulated", "Not Significant"))) %>%
+  ggplot(aes(x=gc_content, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("Downregulated" = "#38A6A5",
+                               "Upregulated" = "#CC503E",
+                               "Not Significant" = "#E5E5E5")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("UPF1 - GC content of transcripts") + labs(y = "Cumulative frequency",
+                                              x = "Length (bp)",
+                                 color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20)) 
+  
+```
+
+```{r}
+res_dte$FRAX %>% 
+  left_join(transGR %>%
+              as.data.frame() %>%
+              dplyr::select(tx_id,gc_content), by = "tx_id") %>%
+  mutate(sig = ifelse(logFC > (0) & FDR < 0.05, "Upregulated",
+                      ifelse(logFC < 0 & FDR < 0.05, "Downregulated", "Not Significant"))) %>%
+  ggplot(aes(x=gc_content, color = sig)) + stat_ecdf(geom = "step", size=1.5) +
+ scale_color_manual(values = c("Downregulated" = "#38A6A5",
+                               "Upregulated" = "#CC503E",
+                               "Not Significant" = "#E5E5E5")) + theme_bw() +
+  ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
+  geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
+  ggtitle("FRAX - GC content of transcripts") + labs(y = "Cumulative frequency",
+                                              x = "Length (bp)",
+                                 color = "") +
+  theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
+            axis.title = element_text(size=15, family = "serif"),
+            legend.box.background = element_rect(color = "black"),
+            legend.text = element_text(family = "serif"),
+            legend.title = element_text( family = "serif"),
+            plot.title = element_text(family = "serif", size =20)) 
+  
+```
+
+- Overlap of both types of analysis 
+
+```{r}
+ res_dte$UPF1 %>% 
+  dplyr::filter(FDR < 0.05) %>% 
+  dplyr::select(tx_id, logFC, nif_feature) %>%
+  inner_join(res_dte$FRAX %>% 
+                dplyr::filter(FDR < 0.05) %>%
+               dplyr::select(tx_id, logFC), by = "tx_id") %>%
+  mutate(sig= ifelse(nif_feature == "None", "NIF-", "NIF+")) %>%
+  ggscatter(.,x="logFC.x", y ="logFC.y", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "sig", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "sig", size =3) + 
+    theme_bw() + xlab("UPF1 DETs") +
+  #ylab("Upf3b DSG (log2FC)") +   scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) +  scale_fill_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX DETs")
+```
+
+
+
+```{r}
+ res_dte$UPF1 %>% 
+  dplyr::filter(FDR < 0.05) %>% 
+  dplyr::select(tx_id, logFC, nif_feature) %>%
+  inner_join(res_dte$FRAX %>% 
+                dplyr::filter(FDR < 0.05) %>%
+               dplyr::select(tx_id, logFC), by = "tx_id") %>%
+  mutate(sig= ifelse(nif_feature == "None", "NIF-", "NIF+")) %>%
+  ggscatter(.,x="logFC.x", y ="logFC.y", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "sig", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "sig", size =3) + 
+    theme_bw() + xlab("UPF1 DETs") +
+  #ylab("Upf3b DSG (log2FC)") +   scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) +  scale_fill_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX DETs")
+```
+
+
+
+### Correlation analysis with DEGs
+```{r}
+load("output/DEG-results.Rda")
+```
+
+```{r}
+res_dte$UPF1 %>% 
+  dplyr::filter(FDR < 0.05) %>% 
+  left_join(tx2gene, by="tx_id") %>% 
+  inner_join(upf1_results_lfc %>% 
+               dplyr::filter(adj.P.Val < 0.05) %>%
+               dplyr::rename("gene_id" = "ensembl_gene_id"), by="gene_id") %>%
+    mutate(sig= ifelse(nif_feature == "None", "NIF-", "NIF+")) %>%
+  ggscatter(.,x="logFC.x", y ="logFC.y", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "sig", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "sig", size =3) + 
+    theme_bw() + xlab("UPF1 DETs") +
+  #ylab("Upf3b DSG (log2FC)") +   scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) +  scale_fill_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "UPF1 DEGs")
+  
+```
+
+
+```{r}
+res_dte$FRAX %>% 
+  dplyr::filter(FDR < 0.05) %>% 
+  left_join(tx2gene, by="tx_id") %>% 
+  inner_join(frax_results_lfc %>% 
+               as.data.frame() %>%
+               dplyr::filter(adj.P.Val < 0.05) %>%
+               dplyr::rename("gene_id" = "ensembl_gene_id"), by="gene_id") %>%
+    mutate(sig= ifelse(nif_feature == "None", "NIF-", "NIF+")) %>%
+  ggscatter(.,x="logFC.x", y ="logFC.y", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "sig", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "sig", size =3) + 
+    theme_bw() + xlab("FRAX DETs") +
+  #ylab("Upf3b DSG (log2FC)") +   scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = sig, fill= sig), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = sig), alpha = 0.5) +
+  scale_color_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) +  scale_fill_manual(values = c("NIF+" = "#b23a48",
+                                "NIF-" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX DEGs")
+  
+```
+
