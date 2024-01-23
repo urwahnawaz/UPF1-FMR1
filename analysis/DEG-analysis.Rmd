@@ -246,6 +246,9 @@ frax_results_lfc = topTable(fit,coef = "FRAX", number = Inf) %>%
                       ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig"))) 
 ```
 
+```{r}
+save(frax_results_lfc,upf1_results_lfc, file = here::here("output/DEG-results.Rda"))
+```
 
 
 ```{r}

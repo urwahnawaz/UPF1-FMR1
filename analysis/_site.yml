@@ -13,6 +13,10 @@ navbar:
       href: Exploratory-DEG.html
   - text: DEG analysis
     href: DEG-analysis.html
+  - text: RNA stability
+    href: RNA-stability.html
+  - text: Transcript analysis
+    href: transcript-analysis.html
   right:
   - icon: fab fa-github
     text: Source code
