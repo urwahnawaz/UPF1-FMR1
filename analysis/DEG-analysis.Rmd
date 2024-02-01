@@ -63,6 +63,10 @@ getGeneLists <- function(pwf, goterms, genome, ids){
 ```{r}
 txdf = ensembldb::transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
 tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
+
+gene2symbol = ensembldb::genes(EnsDb.Hsapiens.v86, return.type="DataFrame") %>% 
+  as.data.frame() %>% 
+  dplyr::select(gene_id, gene_name)
 ```
 
 
@@ -1015,8 +1019,258 @@ DT::datatable(distilled$res_enrich[,])
 ## Enrichment analysis with other NMD LCLs 
 
 ```{r}
+lists = list()
+lists$upf3b = read_excel(here::here("data/lists/LCL-gene-list/UPF3B-variants.xlsx")) %>% as.data.frame() %>% 
+  dplyr::rename("gene_name"= "external_gene_name") %>%
+  left_join(gene2symbol, by = "gene_name") %>% 
+  dplyr::select(log2FoldChan, padj, "EnsID" = gene_id , "symbol" = gene_name)
+
+
+lists$upf2_group = read_excel(here::here("data/lists/LCL-gene-list/UPF2-CNV-grouped.xlsx")) %>% 
+  as.data.frame() %>% 
+  dplyr::select(log2FoldChang, padj, EnsID, "symbol" = external_gene_name)
+
+lists$upf2_frameshift= read_excel(here::here("data/lists/LCL-gene-list/UPF2-frameshift-case.xlsx")) %>% as.data.frame() %>% 
+  dplyr::select(log2FoldChange, padj, EnsID , "symbol" = external_gene_name)
+
+lists$smg = read_excel(here::here("data/lists/LCL-gene-list/SMG-LCLs.xlsx")) %>% as.data.frame() %>%
+  mutate_at(.vars = "EnsID", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")  %>% 
+  dplyr::select(log2FoldChange, padj, EnsID, symbol)
+```
+
+Over-representation test 
+
+### Transcript feature analysis 
+
+```{r}
+library(GeneOverlap)
+overlaps_sig = lapply(lists, function(x){
+  sig = x %>% 
+    dplyr::filter(padj < 0.05)
+  bg = calculate.overlap( x = list("x" = x$EnsID,
+                         "upf1" = upf1_results_lfc$ensembl_gene_id))
+  bg = bg$a3
+  upf1_sig = upf1_results_lfc %>%
+    dplyr::filter(adj.P.Val < 0.05)
+    go.obj <- newGeneOverlap(sig$EnsID,
+                         upf1_sig$ensembl_gene_id,
+                         genome.size=length(upf1_results_lfc$ensembl_gene_id))
+     go.obj <- testGeneOverlap(go.obj)
+     enrichment_nif_pval= go.obj@pval
+     enrichment_nif_OR= go.obj@odds.ratio
+      NIF_feature_enrichment = cbind(enrichment_nif_pval, enrichment_nif_OR)
+      return(NIF_feature_enrichment)
+})
+
+overlap_sig_frax = lapply(lists, function(x){
+  sig = x %>% 
+    dplyr::filter(padj < 0.05)
+  bg = calculate.overlap( x = list("x" = x$EnsID,
+                         "frax" = frax_results_lfc$ensembl_gene_id))
+  bg = bg$a3
+  frax_sig = frax_results_lfc %>%
+    dplyr::filter(adj.P.Val < 0.05)
+    go.obj <- newGeneOverlap(sig$EnsID,
+                         frax_sig$ensembl_gene_id,
+                         genome.size=length(frax_results_lfc$ensembl_gene_id))
+     go.obj <- testGeneOverlap(go.obj)
+     enrichment_nif_pval= go.obj@pval
+     enrichment_nif_OR= go.obj@odds.ratio
+      NIF_feature_enrichment = cbind(enrichment_nif_pval, enrichment_nif_OR)
+      return(NIF_feature_enrichment)
+})
 
 ```
+
+```{r}
+frax_sig = frax_results_lfc %>%
+    dplyr::filter(adj.P.Val < 0.05)
+
+upf1_sig = upf1_results_lfc %>%
+    dplyr::filter(adj.P.Val < 0.05)
+go.obj <- newGeneOverlap(upf1_sig$ensembl_gene_id,
+                         frax_sig$ensembl_gene_id,
+                         genome.size=length(upf1_results_lfc$ensembl_gene_id))
+go.obj <- testGeneOverlap(go.obj)
+enrichment_nif_pval= go.obj@pval
+enrichment_nif_OR= go.obj@odds.ratio
+NIF_feature_enrichment = cbind(enrichment_nif_pval, enrichment_nif_OR)
+
+overlaps_sig$frax = NIF_feature_enrichment
+```
+
+## Correlation with UPF1 DEGs 
+```{r}
+do.call(rbind, overlaps_sig) %>% 
+  as.data.frame() %>%
+  mutate(overlap = c("UPF3B LCL DEGs", 
+                     "UPF2 CNVs LCL DEGs", 
+                     "UPF2 Frameshift LCLs", 
+                     "SMG8/9 LCLs DEGs", 
+                     "FRAX LCLs DEGs")) %>%
+ggplot(aes(x=enrichment_nif_OR, y = overlap)) + geom_bar(stat = "identity", fill = "#edafb8") +
+  theme_bw() + geom_vline(xintercept = 1) + 
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=12, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(x="Odds ratio", 
+                  y = "") + 
+  annotate("label", x =0.5, y = 5, label = "8.38-02") +
+   annotate("label", x =0.5, y = 4, label = "4.6e-03") +
+  annotate("label", x =0.5, y = 3, label = " 6.7e-01") +
+  annotate("label", x =0.5, y = 2, label = " 3.97e-01 ") +
+  annotate("label", x =0.5, y = 1, label = " 9.79e-61")
+  
+```
+
+### UPF1 and UPF3B DEGs 
+
+
+```{r}
+upf3b_cor = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,"EnsID" = ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(lists$upf3b %>% 
+               dplyr::filter( padj < 0.05) %>%
+                dplyr::select(EnsID, UPF3B.logFC=log2FoldChan), 
+             by = "EnsID") %>% 
+  ggscatter(., x="logFC", y = "UPF3B.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("UPF3B LCLs (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 21 overlapping genes")
+
+my_gg = upf3b_cor  + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+
+```
+
+
+### UPF1 and UPF2 CNVs DEGs 
+
+
+```{r}
+upf2_cor = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,"EnsID" = ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(lists$upf2_group %>% 
+               dplyr::filter( padj < 0.05) %>%
+                dplyr::select(EnsID, UPF2.logFC=log2FoldChang), 
+             by = "EnsID") %>% 
+  ggscatter(., x="logFC", y = "UPF2.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("UPF2 CNVs LCLs (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 36 overlapping genes")
+
+my_gg = upf2_cor + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+
+```
+
+### UPF1 and UPF2 Frameshift DEGs 
+
+```{r}
+upf2_fs = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,"EnsID" = ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(lists$upf2_frameshift %>% 
+               dplyr::filter( padj < 0.05) %>%
+                dplyr::select(EnsID, UPF2.logFC=log2FoldChange), 
+             by = "EnsID") %>% 
+  ggscatter(., x="logFC", y = "UPF2.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("UPF2 Frameshift LCL (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 5 overlapping genes")
+
+my_gg = upf2_fs  + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+```
+
+## UPF1 DEGs and SMG8/9 LCLs
+
+```{r}
+smg_cor = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,"EnsID" = ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(lists$smg %>% 
+               dplyr::filter( padj < 0.05) %>%
+                dplyr::select(EnsID, SMG.logFC=log2FoldChange), 
+             by = "EnsID") %>% 
+  ggscatter(., x="logFC", y = "SMG.logFC", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("SMG8/9 (log2FoldChange)") + xlab("UPF1 (log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + ggtitle("Direction of expression of the 124 overlapping genes")
+
+my_gg = smg_cor + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBOL), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+```
+
+
+
+## Correlation with FRAX DEGs 
+
+
+```{r}
+do.call(rbind, overlap_sig_frax) %>% 
+  as.data.frame() %>%
+  mutate(overlap = c("UPF3B LCL DEGs", 
+                     "UPF2 CNVs LCL DEGs", 
+                     "UPF2 Frameshift LCLs", 
+                     "SMG8/9 LCLs DEGs")) %>%
+ggplot(aes(x=enrichment_nif_OR, y = overlap)) + geom_bar(stat = "identity", fill = "#edafb8") +
+  theme_bw() + geom_vline(xintercept = 1) + 
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=12, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(x="Odds ratio", 
+                  y = "") + 
+  annotate("label", x =0.25, y = 4, label = " 0.99") +
+   annotate("label", x =0.25, y = 3, label = " 0.65") +
+  annotate("label", x =0.25, y = 2, label = " 0.99") +
+  annotate("label", x =0.25, y = 1, label = "  0.44") 
+  
+```
+
+
 
 # Data export
 
