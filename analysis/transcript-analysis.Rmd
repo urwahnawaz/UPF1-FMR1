@@ -572,7 +572,7 @@ res_dte$UPF1 %>%
   ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
   geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
   ggtitle("UPF1 - GC content of transcripts") + labs(y = "Cumulative frequency",
-                                              x = "Length (bp)",
+                                              x = "GC content",
                                  color = "") +
   theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
             axis.title = element_text(size=15, family = "serif"),
@@ -597,7 +597,7 @@ res_dte$FRAX %>%
   ylab("Cumulative Frequency") + xlab("") + theme(legend.position = "top") +
   geom_hline(yintercept = c(1, 0),  linetype = "dashed", color = "grey") +
   ggtitle("FRAX - GC content of transcripts") + labs(y = "Cumulative frequency",
-                                              x = "Length (bp)",
+                                              x = "GC content",
                                  color = "") +
   theme(axis.text = element_text(size=12, colour = "black", family = "serif"),
             axis.title = element_text(size=15, family = "serif"),

@@ -1,0 +1,321 @@
+---
+title: "FMR1"
+author: "urwahnawaz"
+date: "2024-02-01"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+# Comparison of DEGs with DSB genes from Chakraborty et al
+
+```{r}
+dsbs = read_xlsx(here::here("data/lists/DSBs/FX_DSB_genes.xlsx"), skip = 1)
+exp_cl = read_xlsx(here::here("data/lists/DSBs/msrd_results_LCL_Silent_Genes.xlsx"), sheet = 1)
+
+dsbs_lcls = dsbs[!dsbs$ensembl_gene_id %in% exp_cl$ensembl_id,]
+```
+
+* Jozef's questions 
+* Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and the DEGs in FRAXA/FMR1 LCLs even if across 2x different studies? If not overlap based on p value, is there a trend for these DSB-associated genes to be downregulated?
+*Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and DEGs in UPF3B patient LCLs, the reason being that UPF3B patients have no or very little FMRP left as Saba determined? Also, if no overlap strictly on p value, is there a trend of the DSB genes to be down-regulated in UPF3B LCLs?
+* The same as above, but comparing the DSB genes to UPF1 DEGs, etc.
+
+
+- From this study - using the FRAX DEGs and UPF1 DEGs 
+
+```{r}
+x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
+        "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05], 
+        "Double stranded breaks" = dsbs$ensembl_gene_id)
+
+ggvenn(x)
+
+```
+
+
+```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
+frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>% 
+  rbind(upf1_results_lfc %>% 
+          dplyr::filter(adj.P.Val < 0.05) %>%
+          mutate(condition="UPF1") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id")) %>%
+  ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
+  theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+                                           "Downregulated"= "#2e294e")) + 
+  ggtitle("Number of DEGs with DSBs")
+```
+
+```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
+library(ggstatsplot)
+frax_results_lfc %>% 
+  mutate(res = ifelse(logFC > 0, "Upregulated", 
+                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>% 
+  rbind(upf1_results_lfc %>% 
+         mutate(res = ifelse(logFC > 0, "Upregulated", 
+                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
+          mutate(condition="UPF1") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id")) %>%
+  ggbarstats(
+  x                = res,
+  y                = condition,
+
+xlab = "",
+legend.title     = "",
+  ggplot.component = list(ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2))),
+) + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+                                           "Downregulated"= "#2e294e"))
+
+
+  
+ # ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
+  #theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
+             #                              "Downregulated"= "#2e294e")) + 
+  #ggtitle("Number of DEGs with DSBs")
+```
+
+```{r}
+library(GeneOverlap)
+enrichment_gene_list_pvalue = list()
+enrichment_gene_list_OR = list()
+
+test.list = list()
+test.list$BG = frax_results_lfc$ensembl_gene_id
+test.list$frax_sig = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05]
+test.list$frax_sig_up = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC > 0]
+test.list$frax_sig_down = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC < 0]
+test.list$upf1_sig = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05]
+test.list$upf1_sig_up = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC > 0]
+test.list$upf1_sig_down = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC < 0]
+test.list$dsbs = dsbs$ensembl_gene_id
+## Maybe an exact test with odds ratio 
+
+for (list in c("frax_sig","frax_sig_up","frax_sig_down","upf1_sig",
+               "upf1_sig_up", "upf1_sig_down")) {
+    go.obj <- newGeneOverlap(test.list[[list]],
+                         test.list$dsbs,
+                         genome.size=length(test.list$BG))
+    go.obj <- testGeneOverlap(go.obj)
+    enrichment_gene_list_pvalue[[paste0(list)]] = go.obj@pval
+    enrichment_gene_list_OR[[paste0(list)]] = go.obj@odds.ratio
+    
+  }
+
+
+enrichment_GL_pval = do.call(rbind, enrichment_gene_list_pvalue) %>% as.data.frame()
+colnames(enrichment_GL_pval)[1] = c("pvalue")
+enrichment_GL_pval$padj = p.adjust(enrichment_GL_pval$pvalue, method = "BH")
+enrichment_GL_OR  = do.call(rbind, enrichment_gene_list_OR) %>% as.data.frame()
+colnames(enrichment_GL_OR)[1] = c("OR")
+GL_enrichment = cbind(enrichment_GL_pval, enrichment_GL_OR)
+```
+
+```{r}
+GL_enrichment %>% 
+  rownames_to_column("DEGs") %>%
+  ggplot(aes(x=OR, y = DEGs)) + geom_bar(stat = "identity", fill = "#edafb8") +
+  theme_bw() + geom_vline(xintercept = 1) + 
+   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=12, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(x="Odds ratio") + ggtitle("Enrichment of DSBs in UPF1 or FRAX")
+
+```
+
+
+### List of genes with DSBs
+
+```{r}
+frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>%
+  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
+  DT::datatable(caption = "Genes in FRAX DEGs with DSBs")
+```
+
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  mutate(condition="FRAX") %>% 
+  inner_join(dsbs, by = "ensembl_gene_id") %>%
+  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
+  DT::datatable(caption = "Genes in UPF1 DEGs with DSBs")
+```
+
+### Expression overlap with genes with DSBs 
+
+```{r}
+library(ggside)
+upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc %>% 
+               dplyr::filter(adj.P.Val < 0.05) %>%
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
+  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
+ ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
+    theme_bw() + xlab("UPF1 (log2FC)") +
+    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
+  scale_color_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
+```
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc  %>%
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
+  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
+ ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
+    theme_bw() + xlab("UPF1 (log2FC)") +
+    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
+  scale_color_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
+
+```
+
+```{r}
+frax_results_lfc %>% 
+  dplyr::filter(ensembl_gene_id %in% fmr1_only) %>% 
+  dplyr::select(SYMBOL,ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val) %>% 
+  inner_join(upf1_results_lfc %>% 
+                dplyr::select(ensembl_gene_id, logFC, 
+                            adj.P.Val), by = "ensembl_gene_id") %>% 
+  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
+ ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
+    theme_bw() + xlab("UPF1 (log2FC)") +
+    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
+  scale_color_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
+```
+
+```{r}
+upf1_results_lfc %>% 
+  dplyr::filter(ensembl_gene_id %in% upf1_only) %>% 
+  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(frax_results_lfc %>% 
+                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
+                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
+  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
+ ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
+              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
+                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
+    theme_bw() + xlab("UPF1 (log2FC)") +
+    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
+    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
+            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
+        axis.title = element_text(size=15, family = "serif"), 
+         legend.box.background = element_rect(color = "black"),
+          legend.text = element_text(family = "serif"), 
+          legend.title = element_text( family = "serif"),
+           plot.title = element_text(family = "serif", size =20),         
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line( size=.1 ),
+              legend.position = "top",
+        strip.text.y = element_text(
+        size = 10, face = "bold.italic", family = "serif"
+        ),
+         strip.text.x = element_text(
+        size = 10, family = "serif"
+        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
+   theme(ggside.panel.scale = .3) +
+  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
+  scale_color_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
+                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
+```

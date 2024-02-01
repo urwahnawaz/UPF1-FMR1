@@ -37,7 +37,7 @@ library(org.Hs.eg.db)
 
 
 ```{r}
-txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+txdf = ensembldb::transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
 tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
 ```
 
@@ -156,7 +156,7 @@ my_gg = volc_upf1 + geom_point_interactive(aes(tooltip =gene, data_id = gene),
 girafe(ggobj = my_gg)
 ```
 
-- FMR1
+- FRAX
 
 ```{r}
 res <- as.data.frame(results(diffrac_res$dds,name = "GroupFRAX.Ratio"))
@@ -206,4 +206,125 @@ volc_fmr1 = res %>%
 my_gg = volc_fmr1 + geom_point_interactive(aes(tooltip =gene, data_id = gene), 
     size = 1, hover_nearest = TRUE)
 girafe(ggobj = my_gg)
+```
+
+### RNA stability analysis using only the data from the first batch to minimise noise 
+
+```{r}
+sampleTable= read.csv("/home/neuro/Documents/NMD_analysis/Analysis/UPF1-FMR1/data/data-stability-no-FMR1-no-UPF1.csv", header=TRUE, sep = ",")
+inputFolder="/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Stability/quantified/"
+```
+
+```{r}
+salmon.files = ("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon")
+salmon = list.files(salmon.files, pattern = "transcripts$", full.names = TRUE)
+sample_names = gsub("/home/neuro/Documents/NMD_analysis/Analysis/Results/UPF1-FMR1/Salmon/", "", salmon)
+sample_names = gsub(".gz_transcripts", "", sample_names)
+sample_names = gsub("\\_.*", "", sample_names)
+md = read.csv(here::here("data/Sample_info.csv"), header= TRUE) %>%  
+  #mutate(files = file.path(salmon, "quant.sf")) %>% 
+  dplyr::rename("names" = "GeneWiz.ID", 
+                "Group" = "Sample.type") %>% 
+  mutate(Group = ifelse(Group == "MC" | Group == "FC", "Control", Group)) %>%
+  dplyr::select(names,everything()) %>% 
+  mutate(names = gsub("\\_.*", "", names) )
+md = md[order(match(md$names, sample_names)),]
+
+
+md %<>% dplyr::filter(Group != "FMR1") %>%
+ dplyr::filter(names != "23-LDJ6767") %>%
+dplyr::filter(names != "202") %>% 
+  dplyr::filter(Batch != 2)
+```
+
+```{r}
+de_exonic  = DESeqDataSetFromHTSeqCount( # omits special rows from htseq-count
+		    sampleTable = sampleTable[sampleTable$ReadType=="exonic",],
+		    directory = inputFolder,
+		    design = ~ 1 # required parameter
+		)
+
+countsEx= counts(de_exonic)
+
+de_intron = DESeqDataSetFromHTSeqCount( # omits special rows from htseq-count
+		    sampleTable = sampleTable[sampleTable$ReadType=="intronic",],
+		    directory = inputFolder,
+		    design = ~ 1 # required parameter
+		)
+countsIn = counts(de_intron)
+```
+
+```{r}
+md$Samples = colnames(countsEx)
+rownames(md) = md$Samples
+```
+
+```{r}
+countsEx = countsEx[rownames(countsEx) %in% rownames(countsIn),]
+countsIn = countsIn[rownames(countsIn) %in% rownames(countsEx),]
+```
+
+```{r}
+diffrac_res <- DiffRAC( ~Group + Sex+ Batch,
+         md,
+         countsEx,countsIn,
+         "sample",
+         optimizeBias = T)
+```
+
+```{r}
+res <- as.data.frame(results(diffrac_res$dds,name = "GroupUPF1.Ratio"))
+res_sig = res %>% dplyr::filter(padj < 0.05)
+res %<>%
+  rownames_to_column("ensembl_gene_id") %>% 
+    mutate(gene = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first"), 
+           entrez = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="ENTREZID",keytype="ENSEMBL", multiVals="first")) %>% drop_na(entrez) %>% 
+  mutate(Expression= ifelse(log2FoldChange > 0 & padj < 0.05, "Upregulated", 
+                            ifelse(log2FoldChange < 0 & padj < 0.05, "Downregulated", "Not Sig")))
+```
+
+```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially stabilized / destabilized genes"}
+
+DEColours <- c("Downregulated" = "#2e294e","Upregulated" = "#720026",  "NotSig" = "#E5E5E5")
+
+
+volc_upf1 = res %>%
+  mutate(Expression= ifelse(log2FoldChange > 0 & padj < 0.05, "Upregulated", 
+                            ifelse(log2FoldChange < 0 & padj < 0.05, "Downregulated", "Not Sig"))) %>%
+    ggplot(aes(y = -log10(padj), 
+               x =  log2FoldChange, 
+               colour = Expression,
+               size =-log10(padj), 
+               label= gene)) +
+  geom_point(alpha = 0.8) +
+  # geom_text(aes(label=ifelse(SYMBOL== "Upf1",as.character(SYMBOL),''))) +
+  #  geom_text(aes(label= SYMBOL), subset = SYMBOL == "Upf1") +
+    scale_colour_manual(values = DEColours) + theme_classic() + 
+    theme(axis.title.y = element_text(size = 12)) +
+    geom_hline(yintercept = -log10(0.05), color = "grey60", size = 0.5, lty = "dashed") +
+    labs(x = "log2 Fold Change", y = "-log10 adj p-value") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") +
+  xlim(-8.5, 8.5) + ylim(0, 7.5)
+
+
+# volc = volc_upf1+ geom_text_repel(data=subset(upf1_results_lfc , SYMBOL %in% c("UPF1", "UPF2", "UPF3B",
+#                       "SMG5", "SMG6",
+#                       "UPF3A", "ATF4", 
+#                       "GADD5G")),
+#             aes(label=SYMBOL),   position=position_dodge(width = 0.9), 
+#              vjust=-0.40, color = "black", box.padding = 0.5, fill = "white") + ggtitle("DEGs in UPF1 relative to controls using limma/voom")
+# 
+# 
+# volc 
+
+my_gg = volc_upf1 + geom_point_interactive(aes(tooltip =gene, data_id = gene), 
+    size = 1, hover_nearest = TRUE)
+girafe(ggobj = my_gg)
+```
+
+### Using a linear model as in Alkallas, R & Najafabadi, H (2022)
+
+```{r}
+
+
 ```
