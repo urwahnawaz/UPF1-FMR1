@@ -61,7 +61,7 @@ getGeneLists <- function(pwf, goterms, genome, ids){
 
 
 ```{r}
-txdf = transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
+txdf = ensembldb::transcripts(EnsDb.Hsapiens.v86, return.type="DataFrame")
 tx2gene = as.data.frame(txdf[,c("tx_id","gene_id", "tx_biotype")])
 ```
 
@@ -80,7 +80,7 @@ trLengths <- exonsBy(ensDb, "tx") %>%
     vapply(sum, integer(1))
 mcols(grTrans)$length <- trLengths[names(grTrans)]
 
-genesGR = genes(ensDb)
+genesGR = ensembldb::genes(ensDb)
 transGR = transcripts(ensDb)
 
 mcols(transGR) = mcols(transGR) %>%
@@ -216,24 +216,249 @@ upf1_results_lfc %>%
 ```
 
 
-<!-- # ```{r} -->
-<!-- # sig_genes = upf1_results_lfc %>%  -->
-<!-- #   dplyr::filter(adj.P.Val < 0.05) %>%  -->
-<!-- #   dplyr::select(ensembl_gene_id)  -->
-<!-- #  -->
-<!-- # not_na = !is.na(genes) -->
-<!-- # names(genes) = upf1_results_lfc$ensembl_gene_id -->
-<!-- # genes = genes[not_na] -->
-<!-- #      -->
-<!-- # pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene') -->
-<!-- # Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE) -->
-<!-- # goterms <- Go.wall$category -->
-<!-- # goList <- getGeneLists(pwf, goterms, 'hg19','ensGene') -->
-<!-- # Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]]) -->
-<!-- # Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L)) -->
-<!-- # ``` -->
+- Gene ontology enrichment analysis 
+
+### Gene tonic for visualisation
+```{r}
+library(GeneTonic)
+library(DESeq2)
+library(AnnotationDbi)
+library(pcaExplorer)
+library(igraph)
+library(visNetwork)
+library(magrittr)
+library(topGO)
 
 
+```
+
+
+```{r}
+tbledger <- as.data.frame(upf1_results_lfc)
+colnames(tbledger)[colnames(tbledger) == "P.Value"] <- "pvalue"
+colnames(tbledger)[colnames(tbledger) == "logFC"] <- "log2FoldChange"
+colnames(tbledger)[colnames(tbledger) == "AveExpr"] <- "baseMean"
+colnames(tbledger)[colnames(tbledger) == "SYMBOL"] <- "SYMBOL"
+rownames(tbledger) =tbledger$ensembl_gene_id
+tbledger$baseMean <- (2^tbledger$baseMean) * mean(y$samples$lib.size) / 1e6
+
+edger_resu <- DESeqResults(DataFrame(tbledger))
+edger_resu <- DESeq2:::pvalueAdjustment(edger_resu,
+                                        independentFiltering = FALSE,
+                                        alpha = FDR, pAdjustMethod = "BH")
+```
+
+```{r}
+anno_df <- data.frame(
+  gene_id = upf1_results_lfc$ensembl_gene_id,
+  gene_name = mapIds(org.Hs.eg.db, keys = upf1_results_lfc$ensembl_gene_id, column = "SYMBOL", keytype = "ENSEMBL"),
+  stringsAsFactors = FALSE,
+  row.names = upf1_results_lfc$ensembl_gene_id
+)
+
+```
+
+```{r}
+sig_upf1 =upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) 
+
+topgo_all_upf1_bp <-
+  pcaExplorer::topGOtable(sig_upf1$SYMBOL,
+                          upf1_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+
+topgo_all_upf1_bp <- shake_topGOtableResult(topgo_all_upf1_bp)
+
+topgo_all_upf1_bp <- get_aggrscores(res_enrich = topgo_all_upf1_bp ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+em <- enrichment_map(topgo_all_upf1_bp,
+                     edger_resu,
+                     n_gs = 30,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+
+```{r}
+library(plotly)
+p <- enhance_table(topgo_all_upf1_bp,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_upf1_bp,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+- Upregulated genes 
+
+```{r}
+sig_upf1 =upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC > 0 ) 
+
+topgo_all_upf1_bp <-
+  pcaExplorer::topGOtable(sig_upf1$SYMBOL,
+                          upf1_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500, 
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+topgo_all_upf1_bp <- shake_topGOtableResult(topgo_all_upf1_bp)
+
+topgo_all_upf1_bp  <- get_aggrscores(res_enrich = topgo_all_upf1_bp ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+
+em <- enrichment_map(topgo_all_upf1_bp,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+```{r}
+p <- enhance_table(topgo_all_upf1_bp,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_upf1_bp,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+
+- Downregulated genes 
+
+```{r}
+sig_upf1 =upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC < 0 ) 
+
+topgo_all_upf1_bp <-
+  pcaExplorer::topGOtable(sig_upf1$SYMBOL,
+                          upf1_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500, 
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+topgo_all_upf1_bp <- shake_topGOtableResult(topgo_all_upf1_bp)
+
+topgo_all_upf1_bp  <- get_aggrscores(res_enrich = topgo_all_upf1_bp ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+
+em <- enrichment_map(topgo_all_upf1_bp,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+```{r}
+p <- enhance_table(topgo_all_upf1_bp,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_upf1_bp,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
 
 ## FRAX DEGs
 ```{r}
@@ -285,8 +510,236 @@ my_gg =  volc_frax + geom_point_interactive(aes(tooltip =SYMBOL, data_id = SYMBO
 girafe(ggobj = my_gg)
 ```
 
+## Enrichment analysis 
+
+```{r}
+tbledger <- as.data.frame(frax_results_lfc)
+colnames(tbledger)[colnames(tbledger) == "P.Value"] <- "pvalue"
+colnames(tbledger)[colnames(tbledger) == "logFC"] <- "log2FoldChange"
+colnames(tbledger)[colnames(tbledger) == "AveExpr"] <- "baseMean"
+colnames(tbledger)[colnames(tbledger) == "SYMBOL"] <- "SYMBOL"
+rownames(tbledger) =tbledger$ensembl_gene_id
+tbledger$baseMean <- (2^tbledger$baseMean) * mean(y$samples$lib.size) / 1e6
+
+edger_resu <- DESeqResults(DataFrame(tbledger))
+edger_resu <- DESeq2:::pvalueAdjustment(edger_resu,
+                                        independentFiltering = FALSE,
+                                        alpha = FDR, pAdjustMethod = "BH")
+```
+
+```{r}
+anno_df <- data.frame(
+  gene_id = frax_results_lfc$ensembl_gene_id,
+  gene_name = mapIds(org.Hs.eg.db, keys = frax_results_lfc$ensembl_gene_id, column = "SYMBOL", keytype = "ENSEMBL"),
+  stringsAsFactors = FALSE,
+  row.names = frax_results_lfc$ensembl_gene_id
+)
+
+```
+
+```{r}
+sig_frax=frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) 
+
+topgo_all_frax <-
+  pcaExplorer::topGOtable(sig_frax$SYMBOL,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
 
 
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
+
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 30,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+
+```{r}
+library(plotly)
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+- Upregulated genes 
+
+```{r}
+sig_frax=frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC > 0 ) 
+
+topgo_all_frax <-
+  pcaExplorer::topGOtable(sig_frax$SYMBOL,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
+
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+```{r}
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+
+- Downregulated genes 
+
+```{r}
+sig_frax=frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05 & logFC < 0 ) 
+
+topgo_all_frax <-
+  pcaExplorer::topGOtable(sig_frax$SYMBOL,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
+
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
+```
+
+
+
+```{r}
+
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
+```
+
+
+```{r}
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
 
 
 ## Overlap of UPF1 and FRAX
@@ -294,8 +747,8 @@ girafe(ggobj = my_gg)
 * Number of genes overlapping
 ```{r}
 library(VennDiagram)
-x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
-        "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05])
+x= list("UPF1 DEGs" = upf1_results_lfc$SYMBOL[upf1_results_lfc$adj.P.Val < 0.05], 
+        "FRAX DEGs" = frax_results_lfc$SYMBOL[frax_results_lfc$adj.P.Val < 0.05])
 
 ggvenn(x)
 ```
@@ -324,54 +777,86 @@ upf1_results_lfc %>%
 
 ```
 
-- Gene ontology
+- Gene ontology of overlapping genes 
+
 
 ```{r}
-genes = as.integer(upf1_results_lfc$ensembl_gene_id %in% overlaps$a3)
-not_na = !is.na(genes)
-names(genes) = upf1_results_lfc$ensembl_gene_id
-genes = genes[not_na]
-    
-pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
-Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
-goterms <- Go.wall$category
-goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
-Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
-Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+sig_genes =overlaps$a3
+
+topgo_all_frax <-
+  pcaExplorer::topGOtable(sig_genes,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
+
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
 ```
+
+
 
 ```{r}
-goRes = Go.wall %>%
-            dplyr::select(-under_represented_pvalue) %>%
-            dplyr::filter(numDEInCat > 0) %>%
-            dplyr::rename(id = category) %>%
-            left_join(goSummaries)
-nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
-goFinal <- goRes %>%
-  dplyr::filter(numDEInCat > 2) %>% 
-  dplyr::filter(shortest_path > 3) %>%
-  arrange(desc(shortest_path), EnsemblID) %>% 
-  distinct(EnsemblID, .keep_all = TRUE) %>%
-  arrange(over_represented_pvalue) %>% 
-  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
-            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
-                   FDR = p.adjust(over_represented_pvalue, "fdr"),
-                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
-            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
-  dplyr::select(term, everything()) 
-  
-  
-goFinal %>% 
-  DT::datatable(caption="222 overlapping genes")
 
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
+
+graph_vis 
 ```
+
+
+```{r}
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+
+
+
+
+
 
 
 - UPF1 specific genes 
 
 ```{r}
 upf1_results_lfc %>% 
-  dplyr::filter(ensembl_gene_id %in% upf1_only) %>% 
+  dplyr::filter(SYMBOL %in% upf1_only) %>% 
   dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
   inner_join(frax_results_lfc %>% 
                 dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
@@ -386,52 +871,71 @@ upf1_results_lfc %>%
 
 ```
 
+
 ```{r}
-genes = as.integer(upf1_results_lfc$ensembl_gene_id %in% upf1_only)
-not_na = !is.na(genes)
-names(genes) = upf1_results_lfc$ensembl_gene_id
-genes = genes[not_na]
-    
-pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
-Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
-goterms <- Go.wall$category
-goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
-Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
-Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
+topgo_all_frax <-
+  pcaExplorer::topGOtable(upf1_only,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
+
+
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
+
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
 ```
 
 ```{r}
-goRes = Go.wall %>%
-            dplyr::select(-under_represented_pvalue) %>%
-            dplyr::filter(numDEInCat > 0) %>%
-            dplyr::rename(id = category) %>%
-            left_join(goSummaries)
-nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
-goFinal <- goRes %>%
-  dplyr::filter(numDEInCat > 2) %>% 
-  dplyr::filter(shortest_path > 4) %>%
-  arrange(desc(shortest_path), EnsemblID) %>% 
-  distinct(EnsemblID, .keep_all = TRUE) %>%
-  arrange(over_represented_pvalue) %>% 
-  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
-            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
-                   FDR = p.adjust(over_represented_pvalue, "fdr"),
-                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
-            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
-  dplyr::select(term, everything()) 
-  
-  
-goFinal %>% 
-  DT::datatable(caption="UPF1 specific genes")
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
 
+graph_vis 
 ```
 
 
-- FMR1 specific genes 
+```{r}
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
+```
+
+
+```{r}
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
+```
+
+- FRAX specific genes 
 
 ```{r}
 frax_results_lfc %>% 
-  dplyr::filter(ensembl_gene_id %in% fmr1_only) %>% 
+  dplyr::filter(SYMBOL %in% fmr1_only) %>% 
   dplyr::select(SYMBOL,ensembl_gene_id, FRAX.logFC=logFC, 
                               FRAX.padj =adj.P.Val) %>% 
   inner_join(upf1_results_lfc %>% 
@@ -448,361 +952,71 @@ frax_results_lfc %>%
 ```
 
 
-Gene ontology
-
-
 ```{r}
-genes = as.integer(frax_results_lfc$ensembl_gene_id %in% fmr1_only)
-not_na = !is.na(genes)
-names(genes) = frax_results_lfc$ensembl_gene_id
-genes = genes[not_na]
-    
-pwf=nullp(genes,plot.fit = FALSE, 'hg19','ensGene')
-Go.wall=goseq(pwf, 'hg19','ensGene', use_genes_without_cat = TRUE)
-goterms <- Go.wall$category
-goList <- getGeneLists(pwf, goterms, 'hg19','ensGene')
-Go.wall$EnsemblID <- sapply(Go.wall$category, function(x) goList[[x]])
-Go.wall$EnsemblID <- vapply(Go.wall$EnsemblID, paste, collapse = ", ", character(1L))
-```
-
-```{r}
-goRes = Go.wall %>%
-            dplyr::select(-under_represented_pvalue) %>%
-            dplyr::filter(numDEInCat > 0) %>%
-            dplyr::rename(id = category) %>%
-            left_join(goSummaries)
-nGenes <- c(BG = sum(genes == 0), DE = sum(genes))
-goFinal <- goRes %>%
-  dplyr::filter(numDEInCat > 2) %>% 
-  dplyr::filter(shortest_path > 4) %>%
-  arrange(desc(shortest_path), EnsemblID) %>% 
-  distinct(EnsemblID, .keep_all = TRUE) %>%
-  arrange(over_represented_pvalue) %>% 
-  mutate(Expected = round(nGenes[["DE"]] * numInCat / nGenes[["BG"]], 0)) %>%
-            mutate(adjP = p.adjust(over_represented_pvalue, "bonferroni"),
-                   FDR = p.adjust(over_represented_pvalue, "fdr"),
-                   Sig_adjP = adjP < 0.05, Sig_FDR = FDR < 0.05) %>%
-            dplyr::filter(Sig_adjP, numDEInCat > Expected) %>%
-  dplyr::select(term, everything()) 
-  
-  
-goFinal %>% 
-  DT::datatable(caption="FRAX specific genes")
-
-```
+topgo_all_frax <-
+  pcaExplorer::topGOtable(fmr1_only,
+                         frax_results_lfc$SYMBOL,
+                          ontology = "BP",
+                          mapping = "org.Hs.eg.db",
+                          geneID = "symbol",
+                          topTablerows = 500,
+                          do_padj = TRUE) %>%
+  as.data.frame() %>%
+  mutate(Ont = "BP") %>%
+  dplyr::filter(p.value_classic < 0.05)
 
 
-# Comparison of DEGs with DSB genes from Chakraborty et al
+topgo_all_frax<- shake_topGOtableResult(topgo_all_frax)
 
-```{r}
-dsbs = read_xlsx(here::here("data/lists/DSBs/FX_DSB_genes.xlsx"), skip = 1)
-exp_cl = read_xlsx(here::here("data/lists/DSBs/msrd_results_LCL_Silent_Genes.xlsx"), sheet = 1)
-
-dsbs_lcls = dsbs[!dsbs$ensembl_gene_id %in% exp_cl$ensembl_id,]
-```
-
-* Jozef's questions 
-* Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and the DEGs in FRAXA/FMR1 LCLs even if across 2x different studies? If not overlap based on p value, is there a trend for these DSB-associated genes to be downregulated?
-*Is there an overlap of genes with DSBs in FRAXA/FMR1 LCLs and DEGs in UPF3B patient LCLs, the reason being that UPF3B patients have no or very little FMRP left as Saba determined? Also, if no overlap strictly on p value, is there a trend of the DSB genes to be down-regulated in UPF3B LCLs?
-* The same as above, but comparing the DSB genes to UPF1 DEGs, etc.
-
-
-- From this study - using the FRAX DEGs and UPF1 DEGs 
-
-```{r}
-x= list("UPF1 DEGs" = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05], 
-        "FRAX DEGs" = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05], 
-        "Double stranded breaks" = dsbs$ensembl_gene_id)
-
-ggvenn(x)
-
-```
-
-
-```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
-frax_results_lfc %>% 
-  dplyr::filter(adj.P.Val < 0.05) %>%
-  mutate(condition="FRAX") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id") %>% 
-  rbind(upf1_results_lfc %>% 
-          dplyr::filter(adj.P.Val < 0.05) %>%
-          mutate(condition="UPF1") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id")) %>%
-  ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
-  theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
-                                           "Downregulated"= "#2e294e")) + 
-  ggtitle("Number of DEGs with DSBs")
-```
-
-```{r fig.cap="Genes with DSBs identified in significantly expressed DEGs"}
-library(ggstatsplot)
-frax_results_lfc %>% 
-  mutate(res = ifelse(logFC > 0, "Upregulated", 
-                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
-  mutate(condition="FRAX") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id") %>% 
-  rbind(upf1_results_lfc %>% 
-         mutate(res = ifelse(logFC > 0, "Upregulated", 
-                      ifelse(logFC < 0, "Downregulated", "NotSig"))) %>%
-          mutate(condition="UPF1") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id")) %>%
-  ggbarstats(
-  x                = res,
-  y                = condition,
-
-xlab = "",
-legend.title     = "",
-  ggplot.component = list(ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(n.dodge = 2))),
-) + scale_fill_manual(values =c("Upregulated"=  "#720026", 
-                                           "Downregulated"= "#2e294e"))
-
-
-  
- # ggplot(aes(x=condition, fill = res), color = "white") + geom_bar(stat = "count") + 
-  #theme_bw() + scale_fill_manual(values =c("Upregulated"=  "#720026", 
-             #                              "Downregulated"= "#2e294e")) + 
-  #ggtitle("Number of DEGs with DSBs")
+topgo_all_frax<- get_aggrscores(res_enrich = topgo_all_frax ,
+                                        res_de = edger_resu,
+                                        annotation_obj = anno_df,
+                                        aggrfun = mean)
 ```
 
 ```{r}
-library(GeneOverlap)
-enrichment_gene_list_pvalue = list()
-enrichment_gene_list_OR = list()
+em <- enrichment_map(topgo_all_frax,
+                     edger_resu,
+                     n_gs = 50,
+                     color_by = "z_score",
+                     anno_df)
+graph_vis = em %>% 
+  visIgraph() %>% 
+  visOptions(highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE),
+             nodesIdSelection = TRUE)
 
-test.list = list()
-test.list$BG = frax_results_lfc$ensembl_gene_id
-test.list$frax_sig = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05]
-test.list$frax_sig_up = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC > 0]
-test.list$frax_sig_down = frax_results_lfc$ensembl_gene_id[frax_results_lfc$adj.P.Val < 0.05 & frax_results_lfc$logFC < 0]
-test.list$upf1_sig = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05]
-test.list$upf1_sig_up = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC > 0]
-test.list$upf1_sig_down = upf1_results_lfc$ensembl_gene_id[upf1_results_lfc$adj.P.Val < 0.05 & upf1_results_lfc$logFC < 0]
-test.list$dsbs = dsbs$ensembl_gene_id
-## Maybe an exact test with odds ratio 
-
-for (list in c("frax_sig","frax_sig_up","frax_sig_down","upf1_sig",
-               "upf1_sig_up", "upf1_sig_down")) {
-    go.obj <- newGeneOverlap(test.list[[list]],
-                         test.list$dsbs,
-                         genome.size=length(test.list$BG))
-    go.obj <- testGeneOverlap(go.obj)
-    enrichment_gene_list_pvalue[[paste0(list)]] = go.obj@pval
-    enrichment_gene_list_OR[[paste0(list)]] = go.obj@odds.ratio
-    
-  }
-
-
-enrichment_GL_pval = do.call(rbind, enrichment_gene_list_pvalue) %>% as.data.frame()
-colnames(enrichment_GL_pval)[1] = c("pvalue")
-enrichment_GL_pval$padj = p.adjust(enrichment_GL_pval$pvalue, method = "BH")
-enrichment_GL_OR  = do.call(rbind, enrichment_gene_list_OR) %>% as.data.frame()
-colnames(enrichment_GL_OR)[1] = c("OR")
-GL_enrichment = cbind(enrichment_GL_pval, enrichment_GL_OR)
-```
-
-```{r}
-GL_enrichment %>% 
-  rownames_to_column("DEGs") %>%
-  ggplot(aes(x=OR, y = DEGs)) + geom_bar(stat = "identity", fill = "#edafb8") +
-  theme_bw() + geom_vline(xintercept = 1) + 
-   theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=12, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(x="Odds ratio") + ggtitle("Enrichment of DSBs in UPF1 or FRAX")
-
-```
-
-
-### List of genes with DSBs
-
-```{r}
-frax_results_lfc %>% 
-  dplyr::filter(adj.P.Val < 0.05) %>%
-  mutate(condition="FRAX") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id") %>%
-  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
-  DT::datatable(caption = "Genes in FRAX DEGs with DSBs")
+graph_vis 
 ```
 
 
 ```{r}
-upf1_results_lfc %>% 
-  dplyr::filter(adj.P.Val < 0.05) %>%
-  mutate(condition="FRAX") %>% 
-  inner_join(dsbs, by = "ensembl_gene_id") %>%
-  dplyr::select(gene = SYMBOL, Expression = res, everything()) %>%
-  DT::datatable(caption = "Genes in UPF1 DEGs with DSBs")
+p <- enhance_table(topgo_all_frax,
+                   edger_resu,
+                   n_gs = 30,
+                   annotation_obj = anno_df,
+                   chars_limit = 60)
+ggplotly(p)
 ```
 
-### Expression overlap with genes with DSBs 
 
 ```{r}
-library(ggside)
-upf1_results_lfc %>% 
-  dplyr::filter(adj.P.Val < 0.05) %>%
-  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
-  inner_join(frax_results_lfc %>% 
-               dplyr::filter(adj.P.Val < 0.05) %>%
-                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
-                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
-  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
- ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
-              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
-                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
-    theme_bw() + xlab("UPF1 (log2FC)") +
-    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
-    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
-  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=15, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
-   theme(ggside.panel.scale = .3) +
-  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
-  scale_color_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
+distilled <- distill_enrichment(topgo_all_frax,
+                                edger_resu,
+                                anno_df,
+                                n_gs = Inf,
+                                cluster_fun = "cluster_markov")
+
+DT::datatable(distilled$res_enrich[,])
 ```
+
+
+## Enrichment analysis with other NMD LCLs 
 
 ```{r}
-upf1_results_lfc %>% 
-  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
-  inner_join(frax_results_lfc  %>%
-                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
-                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
-  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
- ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
-              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
-                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
-    theme_bw() + xlab("UPF1 (log2FC)") +
-    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
-    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
-  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=15, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
-   theme(ggside.panel.scale = .3) +
-  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
-  scale_color_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
 
 ```
-
-```{r}
-frax_results_lfc %>% 
-  dplyr::filter(ensembl_gene_id %in% fmr1_only) %>% 
-  dplyr::select(SYMBOL,ensembl_gene_id, FRAX.logFC=logFC, 
-                              FRAX.padj =adj.P.Val) %>% 
-  inner_join(upf1_results_lfc %>% 
-                dplyr::select(ensembl_gene_id, logFC, 
-                            adj.P.Val), by = "ensembl_gene_id") %>% 
-  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
- ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
-              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
-                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
-    theme_bw() + xlab("UPF1 (log2FC)") +
-    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
-    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
-  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=15, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
-   theme(ggside.panel.scale = .3) +
-  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
-  scale_color_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
-```
-
-```{r}
-upf1_results_lfc %>% 
-  dplyr::filter(ensembl_gene_id %in% upf1_only) %>% 
-  dplyr::select(SYMBOL,ensembl_gene_id, logFC, adj.P.Val) %>% 
-  inner_join(frax_results_lfc %>% 
-                dplyr::select(ensembl_gene_id, FRAX.logFC=logFC, 
-                              FRAX.padj =adj.P.Val), by = "ensembl_gene_id") %>% 
-  mutate(DSBs = ifelse(ensembl_gene_id %in% dsbs$ensembl_gene_id, "DSBs", "No DSBs" )) %>%
- ggscatter(., x="logFC", y = "FRAX.logFC", cor.coef = TRUE, add = "reg.line",
-              conf.int = TRUE, color = "DSBs", add.params = list(color = "blue",
-                                                 fill = "lightgray"), alpha =0.8, shape = "DSBs", size =3) + 
-    theme_bw() + xlab("UPF1 (log2FC)") +
-    scale_color_manual(values = c("#F15A2B", "#2E368F")) + 
-    geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
-  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60") + theme(legend.position = "none") +
-  theme(axis.text.x = element_text(size = 12, family = "serif", color = "black"),
-            axis.text.y = element_text(size = 12, family = "serif", color = "black"),
-        axis.title = element_text(size=15, family = "serif"), 
-         legend.box.background = element_rect(color = "black"),
-          legend.text = element_text(family = "serif"), 
-          legend.title = element_text( family = "serif"),
-           plot.title = element_text(family = "serif", size =20),         
-        panel.grid.major.x = element_blank(),
-        panel.grid.major.y = element_line( size=.1 ),
-              legend.position = "top",
-        strip.text.y = element_text(
-        size = 10, face = "bold.italic", family = "serif"
-        ),
-         strip.text.x = element_text(
-        size = 10, family = "serif"
-        )) + labs(color = "Expression") + geom_xsideboxplot(aes(y = DSBs, fill= DSBs), orientation = "y") +
-   theme(ggside.panel.scale = .3) +
-  scale_xsidey_discrete()  + geom_ysidedensity(aes(x = after_stat(density), fill = DSBs), alpha = 0.5) +
-  scale_color_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) +  scale_fill_manual(values = c("DSBs" = "#b23a48",
-                                "No DSBs" = "grey")) + scale_shape_manual(values = c(19,15)) + labs(y= "FRAX (log2FC)")
-```
-
 
 # Data export
 
