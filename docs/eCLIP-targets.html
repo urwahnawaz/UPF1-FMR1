@@ -372,7 +372,7 @@ div.tocify {
   <a href="transcript-analysis.html">Transcript analysis</a>
 </li>
 <li>
-  <a href="eclip-targets.html">ENCODE eCLIP and shRNA</a>
+  <a href="eCLIP-targets.html">ENCODE eCLIP and shRNA</a>
 </li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
@@ -562,15 +562,15 @@ project makes it easier to run your code on other machines.</p>
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree9853d523eda8e4eabad79f3d6562d3f8d558137atargetblank9853d52a">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree0acdc8974f5df5ed155631eee6b7d064ce0e7199targetblank0acdc89a">
 <span class="glyphicon glyphicon-ok text-success"
 aria-hidden="true"></span> <strong>Repository version:</strong>
-<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/9853d523eda8e4eabad79f3d6562d3f8d558137a" target="_blank">9853d52</a>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/0acdc8974f5df5ed155631eee6b7d064ce0e7199" target="_blank">0acdc89</a>
 </a>
 </p>
 </div>
 <div
-id="strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree9853d523eda8e4eabad79f3d6562d3f8d558137atargetblank9853d52a"
+id="strongRepositoryversionstrongahrefhttpsgithubcomurwahnawazUPF1FMR1tree0acdc8974f5df5ed155631eee6b7d064ce0e7199targetblank0acdc89a"
 class="panel-collapse collapse">
 <div class="panel-body">
 <p>
@@ -580,7 +580,7 @@ reproducibility.
 </p>
 <p>
 The results in this page were generated with repository version
-<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/9853d523eda8e4eabad79f3d6562d3f8d558137a" target="_blank">9853d52</a>.
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/tree/0acdc8974f5df5ed155631eee6b7d064ce0e7199" target="_blank">0acdc89</a>.
 See the <em>Past versions</em> tab to see a history of the changes made
 to the R Markdown and HTML files.
 </p>
@@ -657,6 +657,23 @@ Message
 <tbody>
 <tr>
 <td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/urwahnawaz/UPF1-FMR1/0acdc8974f5df5ed155631eee6b7d064ce0e7199/docs/eCLIP-targets.html" target="_blank">0acdc89</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-02-23
+</td>
+<td>
+Build site.
+</td>
+</tr>
+<tr>
+<td>
 Rmd
 </td>
 <td>
@@ -714,6 +731,43 @@ x= list(&quot;UPF1 DEGs LCLs&quot; = upf1_lcls$ensembl_gene_id,
 
 ggvenn(x)</code></pre>
 <p><img src="figure/eCLIP-targets.Rmd/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-3-1">
+Past versions of unnamed-chunk-3-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-3-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/blob/0acdc8974f5df5ed155631eee6b7d064ce0e7199/docs/figure/eCLIP-targets.Rmd/unnamed-chunk-3-1.png" target="_blank">0acdc89</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-02-23
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <pre class="r"><code>upf1_lcls %&gt;% 
   dplyr::select(SYMBOL, &quot;id&quot;= ensembl_gene_id, logFC, adj.P.Val) %&gt;% 
   inner_join(shRNA_targets %&gt;% 
@@ -726,6 +780,43 @@ ggvenn(x)</code></pre>
   geom_hline(yintercept = 0, size = 0.5,lty = &quot;dashed&quot;, color = &quot;grey60&quot;) +
   geom_vline(xintercept = 0, size = 0.5, lty = &quot;dashed&quot;, color = &quot;grey60&quot;)</code></pre>
 <p><img src="figure/eCLIP-targets.Rmd/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-4-1">
+Past versions of unnamed-chunk-4-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-4-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/blob/0acdc8974f5df5ed155631eee6b7d064ce0e7199/docs/figure/eCLIP-targets.Rmd/unnamed-chunk-4-1.png" target="_blank">0acdc89</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-02-23
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <pre class="r"><code>upf1_lcls %&gt;% 
   dplyr::select(SYMBOL, &quot;id&quot;= ensembl_gene_id, logFC, adj.P.Val) %&gt;% 
   inner_join(shRNA_targets %&gt;% 
@@ -790,6 +881,43 @@ x= list(&quot;UPF1 DEGs LCLs&quot; = upf1_lcls$ensembl_gene_id,
 
 ggvenn(x)</code></pre>
 <p><img src="figure/eCLIP-targets.Rmd/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-6-1">
+Past versions of unnamed-chunk-6-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-6-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/blob/0acdc8974f5df5ed155631eee6b7d064ce0e7199/docs/figure/eCLIP-targets.Rmd/unnamed-chunk-6-1.png" target="_blank">0acdc89</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-02-23
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <pre class="r"><code>upf1_lcls %&gt;% 
   dplyr::select(SYMBOL, &quot;id&quot;= ensembl_gene_id, logFC, adj.P.Val) %&gt;% 
   inner_join(genes_interact%&gt;% 
@@ -803,6 +931,43 @@ ggvenn(x)</code></pre>
 
 ggvenn(x)</code></pre>
 <p><img src="figure/eCLIP-targets.Rmd/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>
+<button type="button" class="btn btn-default btn-xs btn-workflowr btn-workflowr-fig" data-toggle="collapse" data-target="#fig-unnamed-chunk-8-1">
+Past versions of unnamed-chunk-8-1.png
+</button>
+</p>
+<div id="fig-unnamed-chunk-8-1" class="collapse">
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<a href="https://github.com/urwahnawaz/UPF1-FMR1/blob/0acdc8974f5df5ed155631eee6b7d064ce0e7199/docs/figure/eCLIP-targets.Rmd/unnamed-chunk-8-1.png" target="_blank">0acdc89</a>
+</td>
+<td>
+urwahnawaz
+</td>
+<td>
+2024-02-23
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
