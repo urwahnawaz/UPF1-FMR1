@@ -1,0 +1,162 @@
+---
+title: "eCLIP-targets"
+author: "urwahnawaz"
+date: "2024-02-22"
+output: 
+  html_notebook: default
+  workflowr::wflow_html:
+    code_folding: hide
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    autodep = TRUE,
+    eval = TRUE,
+	echo = TRUE,
+	warning = FALSE,
+	message = FALSE
+)
+```
+
+```{r}
+source(here::here("code/libraries.R"))
+library(stargazer)
+library(ggfortify)
+library(glue)
+library(cowplot)
+library(broom)
+library(glmpca)
+library(naniar)
+library(gridExtra)
+library(EnsDb.Hsapiens.v86)
+library(ggrepel)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(fgsea)
+library(GenomicRanges)
+
+```
+
+```{r}
+upf1_lcls = read.csv("output/UPF1-LCLs-DEGs.csv") %>% 
+  dplyr::filter(adj.P.Val < 0.05)
+shRNA_targets = read.table("/home/neuro/Documents/NMD_analysis/Analysis/Data/ENCODE_eCLIP/shRNA/ENCFF734AHK.tsv", header=TRUE) %>% 
+  dplyr::filter(padj < 0.05) %>% 
+  mutate_at(.vars = "id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+bedNPs = read.table("/home/neuro/Documents/NMD_analysis/Analysis/Data/ENCODE_eCLIP/UPF1/ENCFF713NFZ.bed")
+colnames(bedNPs) = c("chrom", "chromStart", "chromEnd", "name", 
+                     "score", "strand", "signalValue", "pValue", "qValue", "peak")
+```
+
+## shRNA to determine RBP responsive genes 
+
+```{r}
+library(VennDiagram)
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
+        "UPF1 DEGs K562 " = shRNA_targets$id)
+
+ggvenn(x)
+```
+
+```{r}
+upf1_lcls %>% 
+  dplyr::select(SYMBOL, "id"= ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(shRNA_targets %>% 
+                dplyr::select(id, log2FoldChange), by = "id") %>% 
+  ggscatter(., x="logFC", y = "log2FoldChange", cor.coef = TRUE, add = "reg.line", 
+              size=5, alpha =0.6, 
+              conf.int = TRUE, add.params = list(color = "#EF3829",
+                                                 fill = "lightgray")) + 
+    theme_bw() + ylab("UPF1 DEGs K562 (log2FoldChange)") + xlab("UPF1 DEGS LCLs(log2FoldChange)") +
+  geom_hline(yintercept = 0, size = 0.5,lty = "dashed", color = "grey60") +
+  geom_vline(xintercept = 0, size = 0.5, lty = "dashed", color = "grey60")
+```
+
+```{r}
+upf1_lcls %>% 
+  dplyr::select(SYMBOL, "id"= ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(shRNA_targets %>% 
+                dplyr::select(id, log2FoldChange), by = "id") %>%
+  DT::datatable()
+```
+
+## eCLIP data 
+
+```{r}
+library(ensembldb)
+library(ChIPseeker)
+library(EnsDb.Hsapiens.v86) # this pkg is about 75 Mb
+ah <- AnnotationHub() %>%
+    subset(species == "Homo sapiens") %>%
+    subset(rdataclass == "EnsDb") %>% 
+  subset(genome == "GRCh38")
+
+ensDb <- ah[["AH109606"]]
+grTrans <- transcripts(ensDb)
+trLengths <- exonsBy(ensDb, "tx") %>%
+    width() %>%
+    vapply(sum, integer(1))
+mcols(grTrans)$length <- trLengths[names(grTrans)]
+
+genesGR = ensembldb::genes(ensDb)
+transGR = transcripts(ensDb)
+
+## significant enrichment
+
+bedNPs %<>% 
+  mutate(pval = 10^(-pValue)) %>% 
+  dplyr::filter(pval < 0.001 & signalValue >=3) %>% 
+  mutate(chrom = gsub("chr", "", chrom))
+  
+
+
+regions.gr = GRanges(seqnames =Rle(bedNPs$chrom) ,
+                     ranges=IRanges(start=bedNPs$chromStart, end=bedNPs$chromEnd), 
+                     strand = bedNPs$strand, 
+                     names = bedNPs$name)
+
+overlapGenes <- findOverlaps(genesGR, regions.gr) 
+
+overlaps <- pintersect(genesGR[queryHits(overlapGenes)], regions.gr[subjectHits(overlapGenes)])
+percentOverlap <- width(overlaps) / width(regions.gr[subjectHits(overlapGenes)])
+hits <- overlapGenes[percentOverlap > 0.5]
+
+regions.gr$gene_name <- NA
+regions.gr$gene_name[subjectHits(hits)] <- genesGR$gene_name[queryHits(hits)]
+
+
+genes_interact = countOverlaps(genesGR, regions.gr)%>% 
+  as.data.frame() %>% 
+  set_colnames("Overlap") %>% 
+  dplyr::filter(Overlap >0)
+
+
+
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
+        "UPF1 eCLIP targets K562 " = rownames(genes_interact))
+
+ggvenn(x)
+
+```
+
+```{r}
+upf1_lcls %>% 
+  dplyr::select(SYMBOL, "id"= ensembl_gene_id, logFC, adj.P.Val) %>% 
+  inner_join(genes_interact%>% 
+               rownames_to_column("id"), by = "id") %>%
+  DT::datatable()
+```
+
+
+```{r}
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
+        "UPF1 eCLIP targets K562 " = rownames(genes_interact),
+         "UPF1 DEGs K562 " = shRNA_targets$id)
+
+ggvenn(x)
+
+```
