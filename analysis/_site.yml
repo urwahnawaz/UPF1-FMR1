@@ -17,6 +17,8 @@ navbar:
     href: RNA-stability.html
   - text: Transcript analysis
     href: transcript-analysis.html
+  - text: ENCODE eCLIP and shRNA
+    href: eCLIP-targets.html
   right:
   - icon: fab fa-github
     text: Source code
