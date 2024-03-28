@@ -172,6 +172,8 @@ upf1_results_lfc = topTable(fit,coef = "UPF1", number = Inf) %>%
    mutate(SYMBOL = mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="SYMBOL",keytype="ENSEMBL", multiVals="first")) %>%
   mutate(res = ifelse(logFC > 0 & adj.P.Val < 0.05, "Upregulated", 
                       ifelse(logFC < 0  & adj.P.Val < 0.05, "Downregulated", "NotSig")))
+
+write.csv(upf1_results_lfc, file = "output/UPF1-LCLs-DEGs.csv")
 ```
 
 ```{r fig.height=8, fig.width=10, fig.cap="Volcano plot showing distribution of differentially expressed genes using the limma/voom pipeline"}
@@ -1273,4 +1275,31 @@ ggplot(aes(x=enrichment_nif_OR, y = overlap)) + geom_bar(stat = "identity", fill
 
 
 # Data export
+
+```{r}
+# Export for RBP analysis
+
+res_for_RBP = upf1_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>% 
+  dplyr::select(ensembl_gene_id, res) %>%
+  mutate(Identifier= mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="REFSEQ",keytype="ENSEMBL", multiVals="first")) %>% 
+  drop_na()
+bg_for_RBP =upf1_results_lfc %>%
+  dplyr::select(ensembl_gene_id, res) %>%
+  mutate(Identifier= mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="REFSEQ",keytype="ENSEMBL", multiVals="first")) %>% 
+  drop_na()
+
+
+res_FRAX = frax_results_lfc %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>% 
+  dplyr::select(ensembl_gene_id, res) %>%
+  mutate(Identifier= mapIds(org.Hs.eg.db, keys=ensembl_gene_id,  column="REFSEQ",keytype="ENSEMBL", multiVals="first")) %>% 
+  drop_na()
+
+write.csv(res_for_RBP, file = here::here("output/UPF1-DEG-RBPs-res.csv"))
+write.csv(bg_for_RBP, file = here::here("output/background-RBPs-res.csv"))
+write.csv(res_FRAX, file = here::here("output/FRAX-DEG-RBPs-res.csv"))
+
+
+```
 
