@@ -52,6 +52,31 @@ colnames(bedNPs) = c("chrom", "chromStart", "chromEnd", "name",
                      "score", "strand", "signalValue", "pValue", "qValue", "peak")
 ```
 
+```{r}
+loj <- function(a, b, out, fun = "-loj") {
+    call <- paste("intersectBed",
+                "-a", a,
+                "-b", b,
+                fun, 
+                ">", out)
+    system(call, intern = FALSE, wait = TRUE)    
+    print("Complete!")
+  }
+  
+  
+  # intersect with full report
+  wawb <- function(a, b, out) {
+    call <- paste("intersectBed",
+                "-a", a,
+                "-b", b,
+                "-wa", "-wb", 
+                ">", out)
+    system(call, intern = FALSE, wait = TRUE)    
+    print("Complete!")
+  }
+  
+```
+
 ## shRNA to determine RBP responsive genes 
 
 ```{r}
@@ -87,76 +112,238 @@ upf1_lcls %>%
 ## eCLIP data 
 
 ```{r}
-library(ensembldb)
-library(ChIPseeker)
-library(EnsDb.Hsapiens.v86) # this pkg is about 75 Mb
-ah <- AnnotationHub() %>%
-    subset(species == "Homo sapiens") %>%
-    subset(rdataclass == "EnsDb") %>% 
-  subset(genome == "GRCh38")
+a= "/home/neuro/Documents/NMD_analysis/Analysis/Data/ENCODE_eCLIP/UPF1/ENCFF713NFZ.bed"
+b= "/home/neuro/Documents/NMD_analysis/Analysis/Genome/gencode.v45.chr_patch_hapl_scaff.annotation.gff3"
 
-ensDb <- ah[["AH109606"]]
-grTrans <- transcripts(ensDb)
-trLengths <- exonsBy(ensDb, "tx") %>%
-    width() %>%
-    vapply(sum, integer(1))
-mcols(grTrans)$length <- trLengths[names(grTrans)]
 
-genesGR = ensembldb::genes(ensDb)
-transGR = transcripts(ensDb)
+  
+out = read.table("/home/neuro/Documents/NMD_analysis/Analysis/Data/ENCODE_eCLIP/UPF1/overlap.txt")
 
-## significant enrichment
+colnames(out)[1:10] =  c("chrom", "chromStart", "chromEnd", "name", 
+                     "score", "strand", "signalValue", "pValue", "qValue", "peak")
 
-bedNPs %<>% 
-  mutate(pval = 10^(-pValue)) %>% 
-  dplyr::filter(pval < 0.001 & signalValue >=3) %>% 
-  mutate(chrom = gsub("chr", "", chrom))
+  
+out %<>% mutate(pval = 10^(-pValue)) %>% 
+  dplyr::filter(pval < 0.001 & signalValue >=3)
   
 
-
-regions.gr = GRanges(seqnames =Rle(bedNPs$chrom) ,
-                     ranges=IRanges(start=bedNPs$chromStart, end=bedNPs$chromEnd), 
-                     strand = bedNPs$strand, 
-                     names = bedNPs$name)
-
-overlapGenes <- findOverlaps(genesGR, regions.gr) 
-
-overlaps <- pintersect(genesGR[queryHits(overlapGenes)], regions.gr[subjectHits(overlapGenes)])
-percentOverlap <- width(overlaps) / width(regions.gr[subjectHits(overlapGenes)])
-hits <- overlapGenes[percentOverlap > 0.5]
-
-regions.gr$gene_name <- NA
-regions.gr$gene_name[subjectHits(hits)] <- genesGR$gene_name[queryHits(hits)]
-
-
-genes_interact = countOverlaps(genesGR, regions.gr)%>% 
+pattern <- paste0("(?<=(", "gene_id=", ")).*?(?=(", ";", "))")
+out %<>% 
+  mutate(gene_id = str_extract(.$V19, pattern)) %>%
   as.data.frame() %>% 
-  set_colnames("Overlap") %>% 
-  dplyr::filter(Overlap >0)
-
+  distinct(gene_id, .keep_all = TRUE) %>% 
+  drop_na(gene_id) %>%
+  mutate_at(.vars = "gene_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
 
 
 x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
-        "UPF1 eCLIP targets K562 " = rownames(genes_interact))
+        "UPF1 eCLIP targets K562 " = out$gene_id)
 
 ggvenn(x)
 
 ```
 
 ```{r}
-upf1_lcls %>% 
-  dplyr::select(SYMBOL, "id"= ensembl_gene_id, logFC, adj.P.Val) %>% 
-  inner_join(genes_interact%>% 
-               rownames_to_column("id"), by = "id") %>%
-  DT::datatable()
+upf1_lcls %>%  
+  dplyr::select(SYMBOL, "gene_id"= ensembl_gene_id, logFC, adj.P.Val) %>%  
+  inner_join(out, by = "gene_id") %>%
+  DT::datatable() 
+
 ```
 
 
 ```{r}
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id,  
+     "UPF1 eCLIP targets K562 " = out$gene_id,
+         "UPF1 DEGs K562 " = shRNA_targets$id) 
+
+ggvenn(x)
+```
+
+
+## FMR1 eCLIP targets and shRNA 
+
+
+```{r}
+# fmr1_shRNA = read.table("/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FMR1/ENCFF551WYQ.tsv",
+#                         header=TRUE) %>% 
+#   dplyr::filter(padj < 0.05) %>% 
+#   mutate_at(.vars = "id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+
+#fmr1_bed = "/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FMR1/ENCFF393YLO.bed" 
+#out.fmr1= "/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FMR1/overlap.txt"
+```
+
+
+```{r}
+#loj(fmr1_bed, b, out.fmr1)
+
+
+out.fmr1  = read.table("/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FMR1/overlap.txt")
+
+colnames(out.fmr1)[1:10] =  c("chrom", "chromStart", "chromEnd", "name", 
+                     "score", "strand", "signalValue", "pValue", "qValue", "peak")
+
+out.fmr1 %<>% mutate(pval = 10^(-pValue)) %>% 
+  dplyr::filter(pval < 0.001 & signalValue >=3)
+  
+
+pattern <- paste0("(?<=(", "gene_id=", ")).*?(?=(", ";", "))")
+out.fmr1 %<>% 
+  mutate(gene_id = str_extract(.$V19, pattern)) %>%
+  as.data.frame() %>% 
+  distinct(gene_id, .keep_all = TRUE) %>% 
+  drop_na(gene_id) %>%
+  mutate_at(.vars = "gene_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+
+```
+
+```{r}
 x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
-        "UPF1 eCLIP targets K562 " = rownames(genes_interact),
-         "UPF1 DEGs K562 " = shRNA_targets$id)
+        "FMR1 eCLIP targets K562 " = out.fmr1$gene_id)
 
 ggvenn(x)
 
 ```
+
+```{r}
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
+        "FMR1 eCLIP targets K562 " = out.fmr1$gene_id, 
+        "UPF1 eCLIP targets K562" = out$gene_id)
+
+ggvenn(x)
+
+```
+
+## FXR1
+
+```{r}
+# fmr1_shRNA = read.table("/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FMR1/ENCFF551WYQ.tsv",
+#                         header=TRUE) %>% 
+#   dplyr::filter(padj < 0.05) %>% 
+#   mutate_at(.vars = "id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+
+fxr1_bed = "/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FXR1/ENCFF136CWQ.bed" 
+out.fxr1 = "/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FXR1/overlap.txt"
+```
+
+
+```{r}
+loj(fxr1_bed, b,out.fxr1)
+
+```
+
+
+```{r}
+out.fxr1  = read.table("/home/neuro/Documents/NMD_analysis/Analysis/databases/ENCODE-eCLIP/FXR1/overlap.txt")
+
+colnames(out.fxr1)[1:10] =  c("chrom", "chromStart", "chromEnd", "name", 
+                     "score", "strand", "signalValue", "pValue", "qValue", "peak")
+
+out.fxr1 %<>% mutate(pval = 10^(-pValue)) %>% 
+  dplyr::filter(pval < 0.001 & signalValue >=3)
+  
+
+pattern <- paste0("(?<=(", "gene_id=", ")).*?(?=(", ";", "))")
+out.fxr1 %<>% 
+  mutate(gene_id = str_extract(.$V19, pattern)) %>%
+  as.data.frame() %>% 
+  distinct(gene_id, .keep_all = TRUE) %>% 
+  drop_na(gene_id) %>%
+  mutate_at(.vars = "gene_id", .funs = gsub, pattern = "\\.[0-9]*$", replacement = "")
+
+```
+
+```{r}
+x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id, 
+        "FMR1 eCLIP targets K562 " = out.fxr1$gene_id)
+
+ggvenn(x)
+
+
+```
+
+
+<!-- # ```{r} -->
+<!-- # library(ensembldb) -->
+<!-- # library(ChIPseeker) -->
+<!-- # library(EnsDb.Hsapiens.v86) # this pkg is about 75 Mb -->
+<!-- # ah <- AnnotationHub() %>% -->
+<!-- #     subset(species == "Homo sapiens") %>% -->
+<!-- #     subset(rdataclass == "EnsDb") %>%  -->
+<!-- #   subset(genome == "GRCh38") -->
+<!-- #  -->
+<!-- # ensDb <- ah[["AH109606"]] -->
+<!-- # grTrans <- transcripts(ensDb) -->
+<!-- # trLengths <- exonsBy(ensDb, "tx") %>% -->
+<!-- #     width() %>% -->
+<!-- #     vapply(sum, integer(1)) -->
+<!-- # mcols(grTrans)$length <- trLengths[names(grTrans)] -->
+<!-- #  -->
+<!-- # genesGR = ensembldb::genes(ensDb) -->
+<!-- # transGR = transcripts(ensDb) -->
+<!-- #  -->
+<!-- # ## significant enrichment -->
+<!-- #  -->
+<!-- # bedNPs %<>%  -->
+<!-- #   mutate(pval = 10^(-pValue)) %>%  -->
+<!-- #   dplyr::filter(pval < 0.001 & signalValue >=3) %>%  -->
+<!-- #   mutate(chrom = gsub("chr", "", chrom)) -->
+<!-- #    -->
+<!-- #  -->
+<!-- #  -->
+<!-- # regions.gr = GRanges(seqnames =Rle(bedNPs$chrom) , -->
+<!-- #                      ranges=IRanges(start=bedNPs$chromStart, end=bedNPs$chromEnd),  -->
+<!-- #                      strand = bedNPs$strand,  -->
+<!-- #                      names = bedNPs$name) -->
+<!-- #  -->
+<!-- # overlapGenes <- findOverlaps(genesGR, regions.gr)  -->
+<!-- #  -->
+<!-- # overlaps <- pintersect(genesGR[queryHits(overlapGenes)], regions.gr[subjectHits(overlapGenes)]) -->
+<!-- # percentOverlap <- width(overlaps) / width(regions.gr[subjectHits(overlapGenes)]) -->
+<!-- # hits <- overlapGenes[percentOverlap > 0.5] -->
+<!-- #  -->
+<!-- # regions.gr$gene_name <- NA -->
+<!-- # regions.gr$gene_name[subjectHits(hits)] <- genesGR$gene_name[queryHits(hits)] -->
+<!-- #  -->
+<!-- #  -->
+<!-- # genes_interact = countOverlaps(genesGR, regions.gr)%>%  -->
+<!-- #   as.data.frame() %>%  -->
+<!-- #   set_colnames("Overlap") %>%  -->
+<!-- #   dplyr::filter(Overlap >0) -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # upf1_lcls %>%  -->
+<!-- #   dplyr::select(SYMBOL, "id"= ensembl_gene_id, logFC, adj.P.Val) %>%  -->
+<!-- #   inner_join(genes_interact%>%  -->
+<!-- #                rownames_to_column("id"), by = "id") %>% -->
+<!-- #   DT::datatable() -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # x= list("UPF1 DEGs LCLs" = upf1_lcls$ensembl_gene_id,  -->
+<!-- #         "UPF1 eCLIP targets K562 " = rownames(genes_interact), -->
+<!-- #          "UPF1 DEGs K562 " = shRNA_targets$id) -->
+<!-- #  -->
+<!-- # ggvenn(x) -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ```{r} -->
+<!-- # shRNA_targets %>%  -->
+<!-- #   with(table(sign(.$log2FoldChange))) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ### -->
+
+
+
